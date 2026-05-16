@@ -416,6 +416,7 @@
               <th>Store Code</th>
               <th>Store Name</th>
               <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -423,13 +424,42 @@
               <tr>
                 <td><code>${escapeHtml(l.storeCode)}</code></td>
                 <td>${escapeHtml(l.storeName)}</td>
-                <td>${l.isActive ? '<span class="badge badge-ok">Active</span>' : '<span class="badge badge-zero">Disabled</span>'}</td>
+                <td>${l.isActive
+                  ? '<span class="badge badge-ok">Active</span>'
+                  : '<span class="badge badge-zero">Disabled</span>'}</td>
+                <td>
+                  ${l.isActive
+                    ? `<button class="btn btn-danger btn-sm"
+                               onclick="toggleLocationActive('${escapeHtml(l.storeCode)}', false)"
+                               title="Disable this location">🚫 Disable</button>`
+                    : `<button class="btn btn-success btn-sm"
+                               onclick="toggleLocationActive('${escapeHtml(l.storeCode)}', true)"
+                               title="Re-enable this location">✓ Enable</button>`
+                  }
+                </td>
               </tr>
             `).join('')}
           </tbody>
         </table>
       </div>
     `;
+    window.__adminLocations = locations;
+  }
+
+  async function toggleLocationActive(storeCode, makeActive) {
+    if (!confirm((makeActive ? 'Enable' : 'Disable') + ' location ' + storeCode + '?')) return;
+    showSpinner();
+    try {
+      const result = await callApi('api_updateLocation', storeCode, { isActive: makeActive });
+      hideSpinner();
+      if (result.success) {
+        showToast('✓ Location ' + (makeActive ? 'enabled' : 'disabled'), 'success');
+        clearCache();
+        switchAdminTab('locations');
+      } else {
+        showToast(result.message, 'error');
+      }
+    } catch (e) { hideSpinner(); showToast(e.message, 'error'); }
   }
 
   function showAddLocationModal() {

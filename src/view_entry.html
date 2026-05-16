@@ -472,11 +472,22 @@
       return;
     }
 
+    // H-5: Use data-* attributes — never interpolate item data into JS string literals
     list.innerHTML = matches.map(m => `
-      <div class="autocomplete-item" onclick="selectItem(this, '${escapeHtml(m.itemCode)}', '${escapeHtml(m.itemName)}', '${escapeHtml(m.unit)}', ${m.minStock})">
+      <div class="autocomplete-item"
+           data-code="${escapeHtml(m.itemCode)}"
+           data-name="${escapeHtml(m.itemName)}"
+           data-unit="${escapeHtml(m.unit)}"
+           data-minstock="${Number(m.minStock) || 0}">
         <span class="code">${escapeHtml(m.itemCode)}</span> — ${escapeHtml(m.itemName)} <span class="text-muted">(${escapeHtml(m.unit)})</span>
       </div>
     `).join('');
+
+    list.querySelectorAll('.autocomplete-item[data-code]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        selectItem(el, el.dataset.code, el.dataset.name, el.dataset.unit, Number(el.dataset.minstock) || 0);
+      });
+    });
   }
 
   async function selectItem(el, code, name, unit, minStock) {
@@ -556,11 +567,15 @@
       }
     });
 
+    const txnType = document.getElementById('txnType').value;
     return {
-      txnType:        document.getElementById('txnType').value,
+      txnType:        txnType,
       date:           document.getElementById('txnDate').value,
       sourceLocation: document.getElementById('sourceLocation').value,
-      destLocation:   document.getElementById('destLocation') ? document.getElementById('destLocation').value : '',
+      // M-4: destLocation is only relevant for Transfer — omit for other types
+      destLocation:   txnType === 'Transfer' && document.getElementById('destLocation')
+                        ? document.getElementById('destLocation').value
+                        : undefined,
       lpo:            document.getElementById('lpo').value,
       supplier:       document.getElementById('supplier').value,
       requester:      document.getElementById('requester').value,
@@ -682,20 +697,27 @@
   }
 
   function onPasteQtyInput(ta) {
-    const nums = parseQtyList(ta.value);
+    const nums    = parseQtyList(ta.value);
     const preview = document.getElementById('pasteQtyPreview');
     if (!preview) return;
     if (nums.length === 0) { preview.textContent = ''; return; }
 
-    const rows = document.querySelectorAll('#itemsTbody tr');
-    const mapped = Math.min(nums.length, rows.length);
+    // M-3: Count only rows that HAVE an item code (skip empty placeholder rows)
+    const allRows    = Array.from(document.querySelectorAll('#itemsTbody tr'));
+    const filledRows = allRows.filter(tr => (tr.querySelector('.item-code').value || '').trim() !== '');
+    const mapped     = Math.min(nums.length, filledRows.length);
+    const emptyInRange = Math.min(nums.length, allRows.length) - mapped;
+
     preview.innerHTML =
-      nums.length + ' number(s) detected → will fill <strong>' + mapped + '</strong> row(s)' +
-      (nums.length > rows.length
+      nums.length + ' number(s) detected → will fill <strong>' + mapped + '</strong> item row(s)' +
+      (emptyInRange > 0
+        ? ' <span class="text-warning">(' + emptyInRange + ' empty row(s) in range — quantities skipped)</span>'
+        : '') +
+      (nums.length > filledRows.length
         ? ' <span class="text-warning">(extra numbers ignored — add more rows first)</span>'
         : '') +
-      (nums.length < rows.length
-        ? ' <span class="text-muted">(remaining ' + (rows.length - nums.length) + ' rows unchanged)</span>'
+      (nums.length < filledRows.length
+        ? ' <span class="text-muted">(remaining ' + (filledRows.length - nums.length) + ' rows unchanged)</span>'
         : '');
   }
 
@@ -719,7 +741,9 @@
       return;
     }
 
-    const rows = document.querySelectorAll('#itemsTbody tr');
+    // M-3: Only map quantities to rows that have an item code
+    const rows = Array.from(document.querySelectorAll('#itemsTbody tr'))
+      .filter(tr => (tr.querySelector('.item-code').value || '').trim() !== '');
     let applied = 0;
 
     rows.forEach((tr, idx) => {

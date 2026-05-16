@@ -255,7 +255,10 @@ const TransactionService = (function() {
   function checkBalances(validLines, sourceLocation) {
     const errors = [];
     const warnings = [];
-    const movements = DataService.getStockMovementData();
+
+    // H-4: Compute balance map ONCE (O(movements)) — not once per item
+    const balMap  = DataService.computeAllBalances();
+    const locUp   = sourceLocation.toUpperCase();
 
     // Aggregate per-item demand using a consistent uppercase key (C-2: case-insensitive)
     const demand = {};
@@ -269,7 +272,7 @@ const TransactionService = (function() {
     validLines.forEach((line, idx) => {
       const k = line.itemCode.toUpperCase();
       if (reported[k]) return;             // already emitted error/warning for this code
-      const balance = DataService.getBalance(line.itemCode, sourceLocation, movements);
+      const balance = balMap[k + ':' + locUp] || 0;
       const totalRequested = demand[k];   // always uppercase key (C-2)
 
       if (totalRequested > balance) {
@@ -292,10 +295,12 @@ const TransactionService = (function() {
 
   function checkAdjustmentResults(validLines, sourceLocation) {
     const warnings = [];
-    const movements = DataService.getStockMovementData();
+    // H-4: single-pass balance map
+    const balMap = DataService.computeAllBalances();
+    const locUp  = sourceLocation.toUpperCase();
 
     validLines.forEach(line => {
-      const balance = DataService.getBalance(line.itemCode, sourceLocation, movements);
+      const balance = balMap[line.itemCode.toUpperCase() + ':' + locUp] || 0;
       const result = balance + line.qty;
       if (result < 0) {
         warnings.push(
@@ -373,8 +378,8 @@ const TransactionService = (function() {
       };
 
       if (header.txnType === CONFIG.TXN_TYPES.TRANSFER) {
-        rows.push(baseRow(txnId + '-OUT', header.sourceLocation));
-        rows.push(baseRow(txnId + '-IN',  header.destLocation));
+        rows.push(baseRow(txnId + CONFIG.TRANSFER_SUFFIXES.OUT, header.sourceLocation));
+        rows.push(baseRow(txnId + CONFIG.TRANSFER_SUFFIXES.IN,  header.destLocation));
       } else {
         rows.push(baseRow(txnId, header.sourceLocation));
       }

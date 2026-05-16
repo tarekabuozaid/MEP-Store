@@ -32,7 +32,8 @@ const ReportService = (function() {
     const todayByType = { Receipt: 0, Issuance: 0, Adjustment: 0, Transfer: 0 };
     todayTxns.forEach(function(t) {
       if (t.txnType === CONFIG.TXN_TYPES.TRANSFER) {
-        if (t.txnId.endsWith('-OUT')) todayByType.Transfer++;
+        // Count Transfer once per transaction (only the OUT row = the initiating side)
+        if (t.txnId.endsWith(CONFIG.TRANSFER_SUFFIXES.OUT)) todayByType.Transfer++;
       } else {
         todayByType[t.txnType] = (todayByType[t.txnType] || 0) + 1;
       }
@@ -101,7 +102,7 @@ const ReportService = (function() {
     });
 
     return {
-      todayCount:          todayTxns.filter(t => !t.txnId.endsWith('-IN')).length,
+      todayCount:          todayTxns.filter(t => !t.txnId.endsWith(CONFIG.TRANSFER_SUFFIXES.IN)).length,
       todayByType:         todayByType,
       lowStockCount:       lowStockItems.length,
       zeroStockCount:      lowStockItems.filter(i => i.status === 'ZERO').length,

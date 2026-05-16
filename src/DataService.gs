@@ -126,8 +126,9 @@ const DataService = (function() {
       if (!map[key]) map[key] = 0;
 
       if (row.txnType === CONFIG.TXN_TYPES.TRANSFER) {
-        if (row.txnId.endsWith('-OUT')) { map[key] -= row.qty; }
-        else if (row.txnId.endsWith('-IN'))  { map[key] += row.qty; }
+        if      (row.txnId.endsWith(CONFIG.TRANSFER_SUFFIXES.OUT)) { map[key] -= row.qty; }
+        else if (row.txnId.endsWith(CONFIG.TRANSFER_SUFFIXES.IN))  { map[key] += row.qty; }
+        // else: malformed Transfer row — skip to avoid silent balance corruption
       } else if (row.txnType === CONFIG.TXN_TYPES.RECEIPT)    { map[key] += row.qty; }
         else if (row.txnType === CONFIG.TXN_TYPES.ISSUANCE)   { map[key] -= row.qty; }
         else if (row.txnType === CONFIG.TXN_TYPES.ADJUSTMENT) { map[key] += row.qty; }

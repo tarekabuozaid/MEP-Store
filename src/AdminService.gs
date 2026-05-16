@@ -192,6 +192,31 @@ const AdminService = (function() {
 
   // ─── Locations ────────────────────────────────────────────────────
 
+  function updateLocation(storeCode, updates) {
+    AuthService.requireRole(CONFIG.ROLES.ADMIN);
+    if (!storeCode) return { success: false, message: 'Store code is required' };
+
+    const sheet   = getSheet_(CONFIG.SHEETS.LOCATIONS);
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: false, message: 'Location not found' };
+
+    const data = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+    const codeUp = String(storeCode).trim().toUpperCase();
+    let rowIdx = -1;
+    for (let i = 0; i < data.length; i++) {
+      if (String(data[i][0]).toUpperCase() === codeUp) { rowIdx = i; break; }
+    }
+    if (rowIdx === -1) return { success: false, message: 'Location not found' };
+
+    const row = data[rowIdx];
+    if (updates.storeName !== undefined) row[1] = updates.storeName;
+    if (updates.isActive  !== undefined) row[2] = updates.isActive;
+
+    sheet.getRange(rowIdx + 2, 1, 1, 3).setValues([row]);
+    AuditService.log('LOCATION_UPDATED', 'Locations', storeCode, updates);
+    return { success: true, message: 'Updated' };
+  }
+
   function addLocation(locationData) {
     AuthService.requireRole(CONFIG.ROLES.ADMIN);
     if (!locationData || !locationData.storeCode) return { success: false, message: 'Store code is required' };
@@ -224,7 +249,8 @@ const AdminService = (function() {
     deactivateUser: deactivateUser,
     addItem: addItem,
     updateItem: updateItem,
-    addLocation: addLocation
+    addLocation: addLocation,
+    updateLocation: updateLocation
   };
 })();
 
@@ -236,6 +262,7 @@ function api_updateUser(email, updates)  { return AdminService.updateUser(email,
 function api_deactivateUser(email)       { return AdminService.deactivateUser(email); }
 function api_addItem(itemData)           { return AdminService.addItem(itemData); }
 function api_updateItem(code, updates)   { return AdminService.updateItem(code, updates); }
-function api_addLocation(locationData)   { return AdminService.addLocation(locationData); }
+function api_addLocation(locationData)    { return AdminService.addLocation(locationData); }
+function api_updateLocation(code, updates){ return AdminService.updateLocation(code, updates); }
 function api_getAllItems()               { AuthService.requireRole(CONFIG.ROLES.ADMIN); return DataService.getMasterItems(false); }
 function api_getAllLocations()           { AuthService.requireRole(CONFIG.ROLES.ADMIN); return DataService.getLocations(false); }

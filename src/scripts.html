@@ -77,6 +77,12 @@
 
   // ─── View routing ──────────────────────────────────────
   async function navigate(view) {
+    // C-3: guard against null user (slow connection or auth failure)
+    if (!App.user) {
+      const content = document.getElementById('content');
+      if (content) content.innerHTML = '<div class="alert alert-error">⚠ Session not ready — please refresh the page.</div>';
+      return;
+    }
     App.currentView = view;
     document.querySelectorAll('.nav-link').forEach(el => {
       el.classList.toggle('active', el.dataset.view === view);
@@ -179,7 +185,14 @@
 
   // ─── Initial bootstrap ─────────────────────────────────
   document.addEventListener('DOMContentLoaded', function() {
-    const initialView = App.user && App.user.role === 'Admin' ? 'dashboard' : 'entry';
+    // Ensure __USER__ is applied (defensive — normally set by inline script in Index.html)
+    if (!App.user && window.__USER__) App.user = window.__USER__;
+    if (!App.user) {
+      const content = document.getElementById('content');
+      if (content) content.innerHTML = '<div class="alert alert-error">⚠ Could not identify user session. Please refresh the page.</div>';
+      return;
+    }
+    const initialView = App.user.role === 'Admin' ? 'dashboard' : 'entry';
     navigate(initialView);
   });
 

@@ -36,6 +36,12 @@ const CONFIG = {
     Transfer:   'TRF'
   },
 
+  // Transfer row suffixes — centralised so a format change only needs one edit
+  TRANSFER_SUFFIXES: {
+    OUT: '-OUT',   // debit row written at source location
+    IN:  '-IN'     // credit row written at destination location
+  },
+
   // Roles
   ROLES: {
     ADMIN:  'Admin',

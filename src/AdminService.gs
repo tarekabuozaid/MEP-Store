@@ -93,6 +93,26 @@ const AdminService = (function() {
     }
     if (rowIdx === -1) return { success: false, message: 'User not found' };
 
+    // Validate role if being changed
+    if (updates.role !== undefined) {
+      if (!Object.values(CONFIG.ROLES).includes(updates.role)) {
+        return { success: false, message: 'Invalid role: ' + updates.role };
+      }
+    }
+
+    // Validate storeCode if being changed
+    if (updates.storeCode !== undefined) {
+      const isWildcard = updates.storeCode === CONFIG.ADMIN_STORE_CODE;
+      if (!isWildcard && !DataService.isValidLocation(updates.storeCode)) {
+        return { success: false, message: 'Store code does not exist: ' + updates.storeCode };
+      }
+      // Wildcard (*) is only permitted for Admin role
+      const effectiveRole = updates.role !== undefined ? updates.role : data[rowIdx][2];
+      if (isWildcard && effectiveRole !== CONFIG.ROLES.ADMIN) {
+        return { success: false, message: 'Wildcard store code (*) is only allowed for Admin role' };
+      }
+    }
+
     const row = data[rowIdx];
     if (updates.storeCode !== undefined) row[1] = updates.storeCode;
     if (updates.role !== undefined) row[2] = updates.role;

@@ -45,7 +45,15 @@ const TransactionService = (function() {
       };
     }
 
-    // 4. Check balances (Issuance + Transfer only)
+    // 4. Keeper: for Transfer, also verify they own the SOURCE location
+    //    (dest can be any valid location — already validated in validateHeader)
+    if (user.role === CONFIG.ROLES.KEEPER && payload.txnType === CONFIG.TXN_TYPES.TRANSFER) {
+      if (user.storeCode !== payload.sourceLocation) {
+        return failure_('ACCESS_DENIED: You are not authorized for location ' + payload.sourceLocation);
+      }
+    }
+
+    // 5. Check balances (Issuance + Transfer only)
     const allWarnings = headerCheck.warnings.concat(linesCheck.warnings || []);
     const allErrors = linesCheck.errors.slice();
 
@@ -227,7 +235,21 @@ const TransactionService = (function() {
       });
     });
 
-    return { validLines: validLines, errors: errors, warnings: [] };
+    // M-1: Merge duplicate item codes (same code entered on multiple rows)
+    const mergedMap = {};
+    const mergedWarnings = [];
+    validLines.forEach(function(line) {
+      const k = line.itemCode.toUpperCase();
+      if (mergedMap[k]) {
+        mergedMap[k].qty += line.qty;
+        mergedWarnings.push('Duplicate item "' + line.itemCode + '" — quantities merged into one row');
+      } else {
+        mergedMap[k] = { itemCode: line.itemCode, itemName: line.itemName, unit: line.unit, qty: line.qty, minStock: line.minStock };
+      }
+    });
+    const dedupedLines = Object.values(mergedMap);
+
+    return { validLines: dedupedLines, errors: errors, warnings: mergedWarnings };
   }
 
   function checkBalances(validLines, sourceLocation) {
@@ -235,16 +257,20 @@ const TransactionService = (function() {
     const warnings = [];
     const movements = DataService.getStockMovementData();
 
-    // Aggregate per-item demand (in case same item appears multiple times)
+    // Aggregate per-item demand using a consistent uppercase key (C-2: case-insensitive)
     const demand = {};
     validLines.forEach(line => {
       const k = line.itemCode.toUpperCase();
       demand[k] = (demand[k] || 0) + line.qty;
     });
 
+    // Track which codes we have already reported an error for (avoid duplicate errors per code)
+    const reported = {};
     validLines.forEach((line, idx) => {
+      const k = line.itemCode.toUpperCase();
+      if (reported[k]) return;             // already emitted error/warning for this code
       const balance = DataService.getBalance(line.itemCode, sourceLocation, movements);
-      const totalRequested = demand[line.itemCode.toUpperCase()];
+      const totalRequested = demand[k];   // always uppercase key (C-2)
 
       if (totalRequested > balance) {
         errors.push({
@@ -258,6 +284,7 @@ const TransactionService = (function() {
           (balance - totalRequested) + '/' + line.minStock + ')'
         );
       }
+      reported[k] = true;
     });
 
     return { passed: errors.length === 0, errors: errors, warnings: warnings };

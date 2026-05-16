@@ -180,7 +180,7 @@ const ReportService = (function() {
     const data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
     let entries = data.map(row => ({
       logId:     row[0],
-      timestamp: row[1],
+      timestamp: row[1] ? (function(v) { try { return new Date(v).toISOString(); } catch(e) { return String(v); } })(row[1]) : '',
       userEmail: String(row[2] || ''),
       action:    String(row[3] || ''),
       entity:    String(row[4] || ''),

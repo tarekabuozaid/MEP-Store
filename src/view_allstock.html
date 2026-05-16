@@ -209,18 +209,30 @@
     const balMaxRaw    =  document.getElementById('allBalMax')          ? document.getElementById('allBalMax').value          : '';
     const filter       =  window.__allStockFilter || 'instock';
     const { col, dir } =  window.__allStockSort;
+    const sel          =  window.__allStockSelectedLocs;
+    const visLocs      =  (window.__allStockLocations || []).filter(l => sel.has(l.storeCode));
 
     const balMin = balMinRaw !== '' ? Number(balMinRaw) : null;
     const balMax = balMaxRaw !== '' ? Number(balMaxRaw) : null;
 
-    let items = window.__allStockData.slice();
+    // Annotate each item with visTotal = sum of selected stores only
+    let items = window.__allStockData.map(function(i) {
+      const visTotal = visLocs.reduce(function(sum, l) {
+        return sum + ((i.balances[l.storeCode] || {}).balance || 0);
+      }, 0);
+      return Object.assign({}, i, { visTotal: visTotal });
+    });
 
-    // Status
-    if (filter === 'instock') items = items.filter(i => i.total > 0);
-    else if (filter === 'alerts') {
+    // Status — based on VISIBLE stores only
+    if (filter === 'instock') {
+      items = items.filter(i => i.visTotal > 0);
+    } else if (filter === 'alerts') {
       items = items.filter(i => {
-        if (i.minStock > 0 && i.total < i.minStock) return true;
-        return Object.values(i.balances).some(b => b.status !== 'OK');
+        if (i.minStock > 0 && i.visTotal < i.minStock) return true;
+        return visLocs.some(l => {
+          const b = i.balances[l.storeCode];
+          return b && b.status !== 'OK';
+        });
       });
     }
 
@@ -234,9 +246,9 @@
     if (minStockMode === 'set')  items = items.filter(i => i.minStock > 0);
     if (minStockMode === 'none') items = items.filter(i => !i.minStock || i.minStock === 0);
 
-    // Total range
-    if (balMin !== null) items = items.filter(i => i.total >= balMin);
-    if (balMax !== null) items = items.filter(i => i.total <= balMax);
+    // Balance range — against visible total
+    if (balMin !== null) items = items.filter(i => i.visTotal >= balMin);
+    if (balMax !== null) items = items.filter(i => i.visTotal <= balMax);
 
     // Search
     if (search) {
@@ -246,11 +258,11 @@
       );
     }
 
-    // Sort
+    // Sort — 'total' sorts by visTotal so it matches what's displayed
     items.sort(function(a, b) {
-      const va = typeof a[col] === 'string' ? (a[col] || '').toLowerCase() : (a[col] || 0);
-      const vb = typeof b[col] === 'string' ? (b[col] || '').toLowerCase() : (b[col] || 0);
-      return va < vb ? -dir : va > vb ? dir : 0;
+      const valA = col === 'total' ? a.visTotal : (typeof a[col] === 'string' ? (a[col] || '').toLowerCase() : (a[col] || 0));
+      const valB = col === 'total' ? b.visTotal : (typeof b[col] === 'string' ? (b[col] || '').toLowerCase() : (b[col] || 0));
+      return valA < valB ? -dir : valA > valB ? dir : 0;
     });
 
     const countEl = document.getElementById('allStockCount');
@@ -287,8 +299,8 @@
     }
 
     tbody.innerHTML = items.map(i => {
-      // Recalculate total for visible stores only
-      const visTotal = visLocs.reduce((sum, l) => sum + ((i.balances[l.storeCode] || {}).balance || 0), 0);
+      const visTotal = i.visTotal !== undefined ? i.visTotal
+        : visLocs.reduce((sum, l) => sum + ((i.balances[l.storeCode] || {}).balance || 0), 0);
       return `
         <tr>
           <td><code>${escapeHtml(i.itemCode)}</code></td>

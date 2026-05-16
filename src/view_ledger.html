@@ -1,0 +1,140 @@
+<script>
+  // ─── Admin Ledger (Full transactions view) ─────────────────────
+  async function renderLedgerView(container) {
+    const locations = await getLocations();
+
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h2>📚 Transaction Ledger</h2>
+          <button class="btn btn-primary btn-sm" onclick="exportLedger()">⬇ Export to Excel</button>
+        </div>
+
+        <div class="form-row">
+          <div><label>From Date</label><input type="date" id="ledFrom"></div>
+          <div><label>To Date</label><input type="date" id="ledTo"></div>
+          <div>
+            <label>Store</label>
+            <select id="ledLocation">
+              <option value="">All Stores</option>
+              ${locations.map(l => `<option value="${escapeHtml(l.storeCode)}">${escapeHtml(l.storeName)} (${escapeHtml(l.storeCode)})</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Transaction Type</label>
+            <select id="ledType">
+              <option value="">All</option>
+              <option value="Receipt">Receipt</option>
+              <option value="Issuance">Issuance</option>
+              <option value="Adjustment">Adjustment</option>
+              <option value="Transfer">Transfer</option>
+            </select>
+          </div>
+          <div><label>Item Code / Name</label><input type="text" id="ledItem" placeholder="Search..."></div>
+        </div>
+
+        <div class="flex-gap mb-2">
+          <button class="btn btn-primary" onclick="loadLedger()">🔍 Search</button>
+          <button class="btn btn-secondary" onclick="clearLedgerFilters()">Clear Filters</button>
+        </div>
+
+        <div id="ledgerResults"></div>
+      </div>
+    `;
+
+    await loadLedger();
+  }
+
+  async function loadLedger() {
+    const filters = {
+      dateFrom: document.getElementById('ledFrom').value || null,
+      dateTo:   document.getElementById('ledTo').value || null,
+      location: document.getElementById('ledLocation').value || null,
+      txnType:  document.getElementById('ledType').value || null,
+      itemCode: document.getElementById('ledItem').value || null,
+      limit:    1000
+    };
+    document.getElementById('ledgerResults').innerHTML = '<div class="text-center"><div class="spinner"></div></div>';
+    try {
+      const rows = await callApi('api_getLedger', filters);
+      renderLedgerTable(rows);
+      window.__lastLedgerFilters = filters;
+    } catch (e) {
+      document.getElementById('ledgerResults').innerHTML = '<div class="alert alert-error">' + escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  function clearLedgerFilters() {
+    ['ledFrom', 'ledTo', 'ledLocation', 'ledType', 'ledItem'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    loadLedger();
+  }
+
+  function renderLedgerTable(rows) {
+    const box = document.getElementById('ledgerResults');
+    if (rows.length === 0) {
+      box.innerHTML = '<div class="text-center text-muted" style="padding:2rem;">No transactions match your filters</div>';
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="mb-1 text-muted" style="font-size:0.85rem;">Total: ${rows.length} transactions</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>TxnID</th>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Location</th>
+              <th>Item</th>
+              <th class="text-end">Qty</th>
+              <th>LPO</th>
+              <th>Supplier / Requester</th>
+              <th>Entered By</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr>
+                <td><code>${escapeHtml(r.txnId)}</code></td>
+                <td>${formatDate(r.date)}</td>
+                <td><span class="${txnTypeBadgeClass(r.txnType)}">${escapeHtml(r.txnType)}</span></td>
+                <td>${escapeHtml(r.location)}</td>
+                <td>${escapeHtml(r.itemName)} <code class="text-muted">(${escapeHtml(r.itemCode)})</code></td>
+                <td class="text-end"><strong>${r.qty}</strong> ${escapeHtml(r.unit)}</td>
+                <td>${escapeHtml(r.lpo || '—')}</td>
+                <td>${escapeHtml(r.supplier || r.requester || '—')}</td>
+                <td class="text-muted" style="font-size:0.8rem;">${escapeHtml(r.userEmail || '')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  async function exportLedger() {
+    showSpinner();
+    try {
+      const filters = window.__lastLedgerFilters || {};
+      const result = await callApi('api_exportToSheet', filters);
+      hideSpinner();
+      if (result.success) {
+        showModal(`
+          <h3>✓ Export Successful</h3>
+          <p>${result.rowCount} transactions exported to a new Google Sheets file.</p>
+          <p><strong>File name:</strong><br>${escapeHtml(result.fileName)}</p>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+            <a href="${escapeHtml(result.url)}" target="_blank" class="btn btn-primary">📂 Open File</a>
+          </div>
+        `);
+      }
+    } catch (e) {
+      hideSpinner();
+      showToast('Export error: ' + e.message, 'error');
+    }
+  }
+</script>

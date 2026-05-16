@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><?= appName ?></title>
+  <base target="_top">
+  <?!= include('styles') ?>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="brand">📦 <?= appName ?></div>
+
+    <div class="nav-links">
+      <? if (user.role === 'Admin') { ?>
+        <button class="nav-link" data-view="dashboard" onclick="navigate('dashboard')">Dashboard</button>
+        <button class="nav-link" data-view="ledger" onclick="navigate('ledger')">Ledger</button>
+        <button class="nav-link" data-view="allstock" onclick="navigate('allstock')">Stock</button>
+        <button class="nav-link" data-view="entry" onclick="navigate('entry')">New Transaction</button>
+        <button class="nav-link" data-view="admin" onclick="navigate('admin')">Admin</button>
+        <button class="nav-link" data-view="audit" onclick="navigate('audit')">Audit Log</button>
+      <? } else if (user.role === 'Keeper') { ?>
+        <button class="nav-link" data-view="entry" onclick="navigate('entry')">New Transaction</button>
+        <button class="nav-link" data-view="stock" onclick="navigate('stock')">My Stock</button>
+        <button class="nav-link" data-view="history" onclick="navigate('history')">My History</button>
+      <? } else { ?>
+        <button class="nav-link" data-view="dashboard" onclick="navigate('dashboard')">Dashboard</button>
+        <button class="nav-link" data-view="ledger" onclick="navigate('ledger')">Ledger</button>
+        <button class="nav-link" data-view="allstock" onclick="navigate('allstock')">Stock</button>
+      <? } ?>
+    </div>
+
+    <div class="user-chip" title="<?= user.email ?>">
+      <span>👤</span>
+      <span><?= user.fullName || user.email ?></span>
+      <span class="badge <?= 'badge-' + user.role.toLowerCase() ?>"><?= user.role ?></span>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <div class="container">
+    <div id="content"></div>
+  </div>
+
+  <!-- Inject user data into App.user before scripts run -->
+  <script>
+    window.__USER__ = <?!= JSON.stringify(user) ?>;
+  </script>
+
+  <?!= include('scripts') ?>
+  <?!= include('view_entry') ?>
+  <?!= include('view_stock') ?>
+  <?!= include('view_history') ?>
+  <?!= include('view_dashboard') ?>
+  <?!= include('view_ledger') ?>
+  <?!= include('view_allstock') ?>
+  <?!= include('view_admin') ?>
+  <?!= include('view_audit') ?>
+
+  <script>
+    App.user = window.__USER__;
+  </script>
+</body>
+</html>

@@ -1,0 +1,470 @@
+<script>
+  // ─── Admin Management View ─────────────────────────────────────
+  async function renderAdminView(container) {
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-header"><h2>⚙ System Administration</h2></div>
+        <div class="flex-gap" style="border-bottom:2px solid var(--color-border); padding-bottom:0.75rem;">
+          <button class="btn btn-secondary admin-tab active" data-tab="users" onclick="switchAdminTab('users')">👥 Users</button>
+          <button class="btn btn-secondary admin-tab" data-tab="items" onclick="switchAdminTab('items')">📦 Items</button>
+          <button class="btn btn-secondary admin-tab" data-tab="locations" onclick="switchAdminTab('locations')">📍 Locations</button>
+        </div>
+        <div id="adminTabContent" style="margin-top:1rem;"></div>
+      </div>
+    `;
+    switchAdminTab('users');
+  }
+
+  function switchAdminTab(tab) {
+    document.querySelectorAll('.admin-tab').forEach(el => {
+      el.classList.toggle('btn-primary', el.dataset.tab === tab);
+      el.classList.toggle('btn-secondary', el.dataset.tab !== tab);
+    });
+    const content = document.getElementById('adminTabContent');
+    content.innerHTML = '<div class="text-center"><div class="spinner"></div></div>';
+    if (tab === 'users')     loadAdminUsers(content);
+    if (tab === 'items')     loadAdminItems(content);
+    if (tab === 'locations') loadAdminLocations(content);
+  }
+
+  // ─── Users ──────────────────────────────────────────────────────
+  async function loadAdminUsers(container) {
+    const [users, locations] = await Promise.all([
+      callApi('api_getUsers'),
+      getLocations()
+    ]);
+    container.innerHTML = `
+      <div class="flex-between mb-2">
+        <div class="text-muted">Total: ${users.length} users</div>
+        <button class="btn btn-primary btn-sm" onclick="showAddUserModal()">+ Add User</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Full Name</th>
+              <th>Store</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Added</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(u => `
+              <tr>
+                <td><code style="font-size:0.85rem;">${escapeHtml(u.email)}</code></td>
+                <td>${escapeHtml(u.fullName || '—')}</td>
+                <td><code>${escapeHtml(u.storeCode)}</code></td>
+                <td><span class="${roleBadgeClass(u.role)}">${escapeHtml(u.role)}</span></td>
+                <td>${u.isActive ? '<span class="badge badge-ok">Active</span>' : '<span class="badge badge-zero">Disabled</span>'}</td>
+                <td class="text-muted">${u.addedDate ? formatDate(u.addedDate) : '—'}</td>
+                <td>
+                  ${u.email !== App.user.email ? `
+                    <button class="btn btn-secondary btn-sm" onclick="showEditUserModal('${escapeHtml(u.email)}')" title="Edit">✏️</button>
+                    ${u.isActive
+                      ? `<button class="btn btn-danger btn-sm" onclick="deactivateUserFlow('${escapeHtml(u.email)}')" title="Disable">🚫</button>`
+                      : `<button class="btn btn-success btn-sm" onclick="reactivateUser('${escapeHtml(u.email)}')" title="Reactivate">✓</button>`
+                    }
+                  ` : '<span class="text-muted">—</span>'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    window.__adminUsers = users;
+    window.__adminLocations = locations;
+  }
+
+  function showAddUserModal() {
+    const locations = window.__adminLocations || [];
+    showModal(`
+      <h3>+ Add New User</h3>
+      <div id="addUserAlert"></div>
+      <div class="form-group">
+        <label class="required">Email (Gmail)</label>
+        <input type="email" id="newUserEmail" placeholder="user@gmail.com">
+      </div>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="newUserName">
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="required">Role</label>
+          <select id="newUserRole" onchange="onNewUserRoleChange()">
+            <option value="Keeper">Keeper</option>
+            <option value="Admin">Admin</option>
+            <option value="Viewer">Viewer (read-only)</option>
+          </select>
+        </div>
+        <div>
+          <label class="required">Store</label>
+          <select id="newUserStore">
+            ${locations.map(l => `<option value="${escapeHtml(l.storeCode)}">${escapeHtml(l.storeName)} (${escapeHtml(l.storeCode)})</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-success" onclick="submitAddUser()">Save</button>
+      </div>
+    `);
+  }
+
+  function onNewUserRoleChange() {
+    const role = document.getElementById('newUserRole').value;
+    const storeSelect = document.getElementById('newUserStore');
+    if (role === 'Admin') {
+      storeSelect.innerHTML = '<option value="*">All Stores (*)</option>';
+    } else {
+      const locations = window.__adminLocations || [];
+      storeSelect.innerHTML = locations.map(l =>
+        `<option value="${escapeHtml(l.storeCode)}">${escapeHtml(l.storeName)} (${escapeHtml(l.storeCode)})</option>`
+      ).join('');
+    }
+  }
+
+  async function submitAddUser() {
+    const payload = {
+      email:     document.getElementById('newUserEmail').value.trim(),
+      fullName:  document.getElementById('newUserName').value.trim(),
+      role:      document.getElementById('newUserRole').value,
+      storeCode: document.getElementById('newUserStore').value
+    };
+    if (!payload.email) {
+      document.getElementById('addUserAlert').innerHTML = '<div class="alert alert-error">Email is required</div>';
+      return;
+    }
+    showSpinner();
+    try {
+      const result = await callApi('api_addUser', payload);
+      hideSpinner();
+      if (result.success) {
+        showToast('✓ ' + result.message, 'success');
+        closeModal();
+        switchAdminTab('users');
+      } else {
+        document.getElementById('addUserAlert').innerHTML = '<div class="alert alert-error">' + escapeHtml(result.message) + '</div>';
+      }
+    } catch (e) {
+      hideSpinner();
+      document.getElementById('addUserAlert').innerHTML = '<div class="alert alert-error">' + escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  function showEditUserModal(email) {
+    const user = (window.__adminUsers || []).find(u => u.email === email);
+    if (!user) return;
+    const locations = window.__adminLocations || [];
+
+    showModal(`
+      <h3>✏️ Edit: ${escapeHtml(user.fullName || user.email)}</h3>
+      <div id="editUserAlert"></div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" value="${escapeHtml(user.email)}" disabled>
+      </div>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="editUserName" value="${escapeHtml(user.fullName || '')}">
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="required">Role</label>
+          <select id="editUserRole">
+            <option value="Keeper" ${user.role === 'Keeper' ? 'selected' : ''}>Keeper</option>
+            <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
+            <option value="Viewer" ${user.role === 'Viewer' ? 'selected' : ''}>Viewer</option>
+          </select>
+        </div>
+        <div>
+          <label class="required">Store</label>
+          <select id="editUserStore">
+            <option value="*" ${user.storeCode === '*' ? 'selected' : ''}>All Stores (*)</option>
+            ${locations.map(l => `<option value="${escapeHtml(l.storeCode)}" ${l.storeCode === user.storeCode ? 'selected' : ''}>${escapeHtml(l.storeName)} (${escapeHtml(l.storeCode)})</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-success" onclick="submitEditUser('${escapeHtml(email)}')">Save Changes</button>
+      </div>
+    `);
+  }
+
+  async function submitEditUser(email) {
+    const updates = {
+      fullName:  document.getElementById('editUserName').value.trim(),
+      role:      document.getElementById('editUserRole').value,
+      storeCode: document.getElementById('editUserStore').value
+    };
+    showSpinner();
+    try {
+      const result = await callApi('api_updateUser', email, updates);
+      hideSpinner();
+      if (result.success) {
+        showToast('✓ Updated', 'success');
+        closeModal();
+        switchAdminTab('users');
+      } else {
+        document.getElementById('editUserAlert').innerHTML = '<div class="alert alert-error">' + escapeHtml(result.message) + '</div>';
+      }
+    } catch (e) {
+      hideSpinner();
+      document.getElementById('editUserAlert').innerHTML = '<div class="alert alert-error">' + escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  async function deactivateUserFlow(email) {
+    if (!confirm('Are you sure you want to disable access for ' + email + '?')) return;
+    showSpinner();
+    try {
+      const result = await callApi('api_deactivateUser', email);
+      hideSpinner();
+      if (result.success) {
+        showToast('✓ User disabled', 'success');
+        switchAdminTab('users');
+      } else {
+        showToast(result.message, 'error');
+      }
+    } catch (e) { hideSpinner(); showToast(e.message, 'error'); }
+  }
+
+  async function reactivateUser(email) {
+    showSpinner();
+    try {
+      const result = await callApi('api_updateUser', email, { isActive: true });
+      hideSpinner();
+      if (result.success) {
+        showToast('✓ User reactivated', 'success');
+        switchAdminTab('users');
+      } else { showToast(result.message, 'error'); }
+    } catch (e) { hideSpinner(); showToast(e.message, 'error'); }
+  }
+
+  // ─── Items ──────────────────────────────────────────────────────
+  async function loadAdminItems(container) {
+    const items = await callApi('api_getAllItems');
+    container.innerHTML = `
+      <div class="flex-between mb-2">
+        <input type="text" id="itemSearch" placeholder="🔍 Search..." style="flex:1;max-width:400px;" oninput="filterAdminItems()">
+        <button class="btn btn-primary btn-sm" onclick="showAddItemModal()">+ Add Item</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Unit</th>
+              <th class="text-end">Min Stock</th>
+              <th>Category</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="adminItemsTbody"></tbody>
+        </table>
+      </div>
+    `;
+    window.__adminItems = items;
+    renderAdminItems(items);
+  }
+
+  function filterAdminItems() {
+    const q = (document.getElementById('itemSearch').value || '').toLowerCase();
+    const items = window.__adminItems || [];
+    const filtered = q
+      ? items.filter(i => i.itemCode.toLowerCase().includes(q) || i.itemName.toLowerCase().includes(q))
+      : items;
+    renderAdminItems(filtered);
+  }
+
+  function renderAdminItems(items) {
+    const tbody = document.getElementById('adminItemsTbody');
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:2rem;">No items</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map(i => `
+      <tr>
+        <td><code>${escapeHtml(i.itemCode)}</code></td>
+        <td>${escapeHtml(i.itemName)}</td>
+        <td>${escapeHtml(i.unit)}</td>
+        <td class="text-end">${i.minStock || '—'}</td>
+        <td>${escapeHtml(i.category || '—')}</td>
+        <td>${i.isActive ? '<span class="badge badge-ok">Active</span>' : '<span class="badge badge-zero">Disabled</span>'}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="showEditItemModal('${escapeHtml(i.itemCode)}')">✏️</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function showAddItemModal() {
+    showModal(`
+      <h3>+ Add New Item</h3>
+      <div id="addItemAlert"></div>
+      <div class="form-group"><label class="required">Item Code</label><input type="text" id="newItemCode"></div>
+      <div class="form-group"><label class="required">Item Name</label><input type="text" id="newItemName"></div>
+      <div class="form-row">
+        <div><label class="required">Unit</label><input type="text" id="newItemUnit" placeholder="pcs, kg, liter..."></div>
+        <div><label>Min Stock</label><input type="number" id="newItemMin" value="0" min="0"></div>
+        <div><label>Category</label><input type="text" id="newItemCategory"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-success" onclick="submitAddItem()">Save</button>
+      </div>
+    `);
+  }
+
+  async function submitAddItem() {
+    const payload = {
+      itemCode: document.getElementById('newItemCode').value.trim(),
+      itemName: document.getElementById('newItemName').value.trim(),
+      unit:     document.getElementById('newItemUnit').value.trim(),
+      minStock: Number(document.getElementById('newItemMin').value) || 0,
+      category: document.getElementById('newItemCategory').value.trim()
+    };
+    showSpinner();
+    try {
+      const result = await callApi('api_addItem', payload);
+      hideSpinner();
+      if (result.success) {
+        showToast('✓ ' + result.message, 'success');
+        clearCache();
+        closeModal();
+        switchAdminTab('items');
+      } else {
+        document.getElementById('addItemAlert').innerHTML = '<div class="alert alert-error">' + escapeHtml(result.message) + '</div>';
+      }
+    } catch (e) {
+      hideSpinner();
+      document.getElementById('addItemAlert').innerHTML = '<div class="alert alert-error">' + escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  function showEditItemModal(itemCode) {
+    const item = (window.__adminItems || []).find(i => i.itemCode === itemCode);
+    if (!item) return;
+    showModal(`
+      <h3>✏️ Edit: ${escapeHtml(item.itemName)}</h3>
+      <div id="editItemAlert"></div>
+      <div class="form-group"><label>Code</label><input type="text" value="${escapeHtml(item.itemCode)}" disabled></div>
+      <div class="form-group"><label class="required">Name</label><input type="text" id="editItemName" value="${escapeHtml(item.itemName)}"></div>
+      <div class="form-row">
+        <div><label class="required">Unit</label><input type="text" id="editItemUnit" value="${escapeHtml(item.unit)}"></div>
+        <div><label>Min Stock</label><input type="number" id="editItemMin" value="${item.minStock}" min="0"></div>
+        <div><label>Category</label><input type="text" id="editItemCategory" value="${escapeHtml(item.category || '')}"></div>
+      </div>
+      <div class="form-group">
+        <label class="flex" style="align-items:center;gap:0.5rem;">
+          <input type="checkbox" id="editItemActive" ${item.isActive ? 'checked' : ''} style="width:auto;">
+          Active (shown in entry forms)
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-success" onclick="submitEditItem('${escapeHtml(itemCode)}')">Save</button>
+      </div>
+    `);
+  }
+
+  async function submitEditItem(itemCode) {
+    const updates = {
+      itemName: document.getElementById('editItemName').value.trim(),
+      unit:     document.getElementById('editItemUnit').value.trim(),
+      minStock: Number(document.getElementById('editItemMin').value) || 0,
+      category: document.getElementById('editItemCategory').value.trim(),
+      isActive: document.getElementById('editItemActive').checked
+    };
+    showSpinner();
+    try {
+      const result = await callApi('api_updateItem', itemCode, updates);
+      hideSpinner();
+      if (result.success) {
+        showToast('✓ Updated', 'success');
+        clearCache();
+        closeModal();
+        switchAdminTab('items');
+      } else {
+        document.getElementById('editItemAlert').innerHTML = '<div class="alert alert-error">' + escapeHtml(result.message) + '</div>';
+      }
+    } catch (e) {
+      hideSpinner();
+      document.getElementById('editItemAlert').innerHTML = '<div class="alert alert-error">' + escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  // ─── Locations ──────────────────────────────────────────────────
+  async function loadAdminLocations(container) {
+    const locations = await callApi('api_getAllLocations');
+    container.innerHTML = `
+      <div class="flex-between mb-2">
+        <div class="text-muted">Total: ${locations.length} locations</div>
+        <button class="btn btn-primary btn-sm" onclick="showAddLocationModal()">+ Add Location</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Store Code</th>
+              <th>Store Name</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${locations.map(l => `
+              <tr>
+                <td><code>${escapeHtml(l.storeCode)}</code></td>
+                <td>${escapeHtml(l.storeName)}</td>
+                <td>${l.isActive ? '<span class="badge badge-ok">Active</span>' : '<span class="badge badge-zero">Disabled</span>'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function showAddLocationModal() {
+    showModal(`
+      <h3>+ Add New Location</h3>
+      <div id="addLocAlert"></div>
+      <div class="form-group"><label class="required">Store Code</label><input type="text" id="newLocCode" placeholder="e.g. MZ"></div>
+      <div class="form-group"><label class="required">Store Name</label><input type="text" id="newLocName" placeholder="Madinat Zayed"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-success" onclick="submitAddLocation()">Save</button>
+      </div>
+    `);
+  }
+
+  async function submitAddLocation() {
+    const payload = {
+      storeCode: document.getElementById('newLocCode').value.trim(),
+      storeName: document.getElementById('newLocName').value.trim()
+    };
+    showSpinner();
+    try {
+      const result = await callApi('api_addLocation', payload);
+      hideSpinner();
+      if (result.success) {
+        showToast('✓ ' + result.message, 'success');
+        clearCache();
+        closeModal();
+        switchAdminTab('locations');
+      } else {
+        document.getElementById('addLocAlert').innerHTML = '<div class="alert alert-error">' + escapeHtml(result.message) + '</div>';
+      }
+    } catch (e) {
+      hideSpinner();
+      document.getElementById('addLocAlert').innerHTML = '<div class="alert alert-error">' + escapeHtml(e.message) + '</div>';
+    }
+  }
+</script>

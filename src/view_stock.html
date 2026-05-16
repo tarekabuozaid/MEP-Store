@@ -1,0 +1,93 @@
+<script>
+  // ─── Stock View (Keeper: own store / Admin: all stores) ──────
+  async function renderStockView(container) {
+    container.innerHTML = '<div class="card"><div class="text-center"><div class="spinner"></div></div></div>';
+    const stock = await callApi('api_getMyStock');
+    const locName = App.user.role === 'Admin'
+      ? 'All Stores'
+      : ((await getLocations()).find(l => l.storeCode === App.user.storeCode) || {}).storeName || App.user.storeCode;
+
+    const totalItems = stock.length;
+    const lowCount = stock.filter(s => s.status === 'LOW').length;
+    const zeroCount = stock.filter(s => s.status === 'ZERO').length;
+
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h2>📦 Stock: ${escapeHtml(locName)}</h2>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi kpi-success"><div class="kpi-label">Total Items</div><div class="kpi-value">${totalItems}</div></div>
+          <div class="kpi kpi-warning"><div class="kpi-label">Below Minimum</div><div class="kpi-value">${lowCount}</div></div>
+          <div class="kpi kpi-danger"><div class="kpi-label">Out of Stock</div><div class="kpi-value">${zeroCount}</div></div>
+        </div>
+
+        <div class="flex-gap mb-2" style="align-items:center;">
+          <input type="text" id="stockSearch" placeholder="🔍 Search by code or name..." style="flex:1;" oninput="filterStock()">
+          <label class="flex" style="align-items:center;gap:0.3rem;font-weight:normal;">
+            <input type="checkbox" id="lowOnly" onchange="filterStock()" style="width:auto;">
+            Low stock only
+          </label>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Name</th>
+                ${App.user.role === 'Admin' ? '<th>Location</th>' : ''}
+                <th class="text-end">Balance</th>
+                <th>Unit</th>
+                <th class="text-end">Min Stock</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="stockTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    window.__stockData = stock;
+    renderStockRows(stock);
+  }
+
+  function filterStock() {
+    const search = (document.getElementById('stockSearch').value || '').toLowerCase();
+    const lowOnly = document.getElementById('lowOnly').checked;
+    let filtered = window.__stockData;
+    if (search) {
+      filtered = filtered.filter(s =>
+        s.itemCode.toLowerCase().includes(search) ||
+        s.itemName.toLowerCase().includes(search)
+      );
+    }
+    if (lowOnly) {
+      filtered = filtered.filter(s => s.status !== 'OK');
+    }
+    renderStockRows(filtered);
+  }
+
+  function renderStockRows(rows) {
+    const tbody = document.getElementById('stockTbody');
+    if (rows.length === 0) {
+      const cols = App.user.role === 'Admin' ? 7 : 6;
+      tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center text-muted" style="padding:2rem;">No items found</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rows.map(s => `
+      <tr>
+        <td><code>${escapeHtml(s.itemCode)}</code></td>
+        <td>${escapeHtml(s.itemName)}</td>
+        ${App.user.role === 'Admin' ? `<td>${escapeHtml(s.location)}</td>` : ''}
+        <td class="text-end"><strong>${s.balance}</strong></td>
+        <td>${escapeHtml(s.unit)}</td>
+        <td class="text-end text-muted">${s.minStock || '—'}</td>
+        <td>${statusBadge(s.status)}</td>
+      </tr>
+    `).join('');
+  }
+</script>

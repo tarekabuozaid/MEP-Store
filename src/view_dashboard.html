@@ -1,0 +1,128 @@
+<script>
+  // ─── Admin Dashboard ───────────────────────────────────────────
+  async function renderDashboardView(container) {
+    container.innerHTML = '<div class="card"><div class="text-center"><div class="spinner"></div></div></div>';
+    const data = await callApi('api_getDashboardData');
+
+    container.innerHTML = `
+      <div class="card-header" style="background:none;border:none;padding:0;margin-bottom:1rem;">
+        <h2 style="color:var(--color-primary);margin:0;">📊 Dashboard</h2>
+        <span class="text-muted">${formatDate(new Date())}</span>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-label">Today's Transactions</div><div class="kpi-value">${data.todayCount}</div></div>
+        <div class="kpi kpi-warning"><div class="kpi-label">Below Minimum</div><div class="kpi-value">${data.lowStockCount}</div></div>
+        <div class="kpi kpi-danger"><div class="kpi-label">Out of Stock</div><div class="kpi-value">${data.zeroStockCount}</div></div>
+        <div class="kpi kpi-success"><div class="kpi-label">Stores</div><div class="kpi-value">${data.locationCount}</div></div>
+        <div class="kpi"><div class="kpi-label">Total Items</div><div class="kpi-value">${data.itemCount}</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" id="dashGrid">
+        <div class="card">
+          <div class="card-header"><h2>📈 Today's Activity Breakdown</h2></div>
+          ${renderTxnDistribution(data.todayByType)}
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>⚠ Stock Alerts</h2></div>
+          ${renderLowStockList(data.lowStockItems)}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>🕐 Last ${data.recentTransactions.length} Transactions</h2></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>TxnID</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Location</th>
+                <th>Item</th>
+                <th class="text-end">Qty</th>
+                <th>Entered By</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.recentTransactions.length === 0
+                ? '<tr><td colspan="7" class="text-center text-muted" style="padding:2rem;">No transactions yet</td></tr>'
+                : data.recentTransactions.map(r => `
+                  <tr>
+                    <td><code>${escapeHtml(r.txnId)}</code></td>
+                    <td>${formatDate(r.date)}</td>
+                    <td><span class="${txnTypeBadgeClass(r.txnType)}">${escapeHtml(r.txnType)}</span></td>
+                    <td>${escapeHtml(r.location)}</td>
+                    <td>${escapeHtml(r.itemName)} <code class="text-muted">(${escapeHtml(r.itemCode)})</code></td>
+                    <td class="text-end"><strong>${r.qty}</strong> ${escapeHtml(r.unit)}</td>
+                    <td class="text-muted" style="font-size:0.8rem;">${escapeHtml(r.userEmail || '')}</td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    if (window.innerWidth < 900) {
+      document.getElementById('dashGrid').style.gridTemplateColumns = '1fr';
+    }
+  }
+
+  function renderTxnDistribution(byType) {
+    const total = Object.values(byType).reduce((a, b) => a + b, 0);
+    if (total === 0) {
+      return '<div class="text-center text-muted" style="padding:2rem;">No transactions today yet</div>';
+    }
+
+    const items = [
+      { type: 'Receipt',    label: 'Receipt',    color: '#16a34a' },
+      { type: 'Issuance',   label: 'Issuance',   color: '#dc2626' },
+      { type: 'Adjustment', label: 'Adjustment', color: '#d97706' },
+      { type: 'Transfer',   label: 'Transfer',   color: '#2563eb' }
+    ];
+
+    return '<div>' + items.map(it => {
+      const count = byType[it.type] || 0;
+      const pct = total > 0 ? (count / total) * 100 : 0;
+      return `
+        <div style="margin-bottom:0.85rem;">
+          <div class="flex-between" style="margin-bottom:0.25rem;">
+            <span>${it.label}</span>
+            <strong>${count}</strong>
+          </div>
+          <div style="background:#f3f4f6;height:10px;border-radius:5px;overflow:hidden;">
+            <div style="background:${it.color};height:100%;width:${pct}%;transition:width 0.3s;"></div>
+          </div>
+        </div>
+      `;
+    }).join('') + '</div>';
+  }
+
+  function renderLowStockList(items) {
+    if (items.length === 0) {
+      return '<div class="text-center text-success" style="padding:2rem;">✓ All items above minimum stock</div>';
+    }
+    return `
+      <div style="max-height:340px;overflow-y:auto;">
+        ${items.map(i => `
+          <div class="flex-between" style="padding:0.65rem 0;border-bottom:1px solid var(--color-border);">
+            <div>
+              <div><strong>${escapeHtml(i.itemName)}</strong></div>
+              <div class="text-muted" style="font-size:0.8rem;">
+                <code>${escapeHtml(i.itemCode)}</code> · ${escapeHtml(i.locationName)}
+              </div>
+            </div>
+            <div class="text-end">
+              ${statusBadge(i.status)}
+              <div class="text-muted" style="font-size:0.8rem;margin-top:0.25rem;">
+                ${i.balance} / ${i.minStock}
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+</script>

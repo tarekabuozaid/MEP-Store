@@ -1,0 +1,35 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Excel files — contain real company data, excluded from public repo
+*.xlsm
+*.xlsx
+*.xls
+~$*.xlsx
+~$*.xlsm
+~$*.xls
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node / clasp (in case used later)
+node_modules/
+.clasp.json
+.claspignore.local
+package-lock.json
+
+# Local environment
+.env
+.env.local
+
+# Logs
+*.log
+
+# Backups
+*.bak
+*.tmp

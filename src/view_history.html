@@ -1,0 +1,104 @@
+<script>
+  // ─── History View (Keeper: own transactions) ─────────────
+  async function renderHistoryView(container) {
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-header"><h2>📜 My Transaction History</h2></div>
+
+        <div class="form-row">
+          <div><label>From Date</label><input type="date" id="histFrom"></div>
+          <div><label>To Date</label><input type="date" id="histTo"></div>
+          <div>
+            <label>Transaction Type</label>
+            <select id="histType">
+              <option value="">All</option>
+              <option value="Receipt">Receipt</option>
+              <option value="Issuance">Issuance</option>
+              <option value="Adjustment">Adjustment</option>
+              <option value="Transfer">Transfer</option>
+            </select>
+          </div>
+          <div><label>Item Code / Name</label><input type="text" id="histItem" placeholder="Search..."></div>
+        </div>
+
+        <div class="flex-gap mb-2">
+          <button class="btn btn-primary" onclick="loadHistory()">🔍 Search</button>
+          <button class="btn btn-secondary" onclick="clearHistoryFilters()">Clear Filters</button>
+        </div>
+
+        <div id="histResults"></div>
+      </div>
+    `;
+
+    await loadHistory();
+  }
+
+  async function loadHistory() {
+    const filters = {
+      dateFrom: document.getElementById('histFrom').value || null,
+      dateTo:   document.getElementById('histTo').value || null,
+      txnType:  document.getElementById('histType').value || null,
+      itemCode: document.getElementById('histItem').value || null,
+      limit:    500
+    };
+    document.getElementById('histResults').innerHTML = '<div class="text-center"><div class="spinner"></div></div>';
+    try {
+      const rows = await callApi('api_getMyTransactions', filters);
+      renderHistoryTable(rows);
+    } catch (e) {
+      document.getElementById('histResults').innerHTML = '<div class="alert alert-error">' + escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  function clearHistoryFilters() {
+    document.getElementById('histFrom').value = '';
+    document.getElementById('histTo').value = '';
+    document.getElementById('histType').value = '';
+    document.getElementById('histItem').value = '';
+    loadHistory();
+  }
+
+  function renderHistoryTable(rows) {
+    const box = document.getElementById('histResults');
+    if (rows.length === 0) {
+      box.innerHTML = '<div class="text-center text-muted" style="padding:2rem;">No transactions match your filters</div>';
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="mb-1 text-muted" style="font-size:0.85rem;">Total: ${rows.length} transactions</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>TxnID</th>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Code</th>
+              <th>Item</th>
+              <th class="text-end">Qty</th>
+              <th>Unit</th>
+              <th>Location</th>
+              <th>Entered By</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr>
+                <td><code>${escapeHtml(r.txnId)}</code></td>
+                <td>${formatDate(r.date)}</td>
+                <td><span class="${txnTypeBadgeClass(r.txnType)}">${escapeHtml(r.txnType)}</span></td>
+                <td><code>${escapeHtml(r.itemCode)}</code></td>
+                <td>${escapeHtml(r.itemName)}</td>
+                <td class="text-end"><strong>${r.qty}</strong></td>
+                <td>${escapeHtml(r.unit)}</td>
+                <td>${escapeHtml(r.location)}</td>
+                <td class="text-muted" style="font-size:0.8rem;">${escapeHtml(r.userEmail || '')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+</script>

@@ -1,0 +1,339 @@
+<script>
+  // ─── Entry Form View ────────────────────────────────────────────
+  async function renderEntryView(container) {
+    const [items, locations] = await Promise.all([getItems(), getLocations()]);
+    const isAdmin = App.user.role === 'Admin';
+    const defaultLocation = isAdmin ? '' : App.user.storeCode;
+    const userLocations = isAdmin ? locations : locations.filter(l => l.storeCode === App.user.storeCode);
+
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-header"><h2>📝 New Transaction</h2></div>
+
+        <div id="entry-alerts"></div>
+
+        <div class="form-row">
+          <div>
+            <label class="required">Transaction Type</label>
+            <select id="txnType" onchange="onTxnTypeChange()">
+              <option value="Receipt">Receipt</option>
+              <option value="Issuance">Issuance</option>
+              <option value="Adjustment">Adjustment</option>
+              <option value="Transfer">Transfer</option>
+            </select>
+          </div>
+          <div>
+            <label class="required">Date</label>
+            <input type="date" id="txnDate" value="${todayString()}">
+          </div>
+          <div>
+            <label class="required">Source Location</label>
+            <select id="sourceLocation" ${isAdmin ? '' : 'disabled'}>
+              ${isAdmin ? '<option value="">-- Select location --</option>' : ''}
+              ${userLocations.map(l => `<option value="${escapeHtml(l.storeCode)}" ${l.storeCode === defaultLocation ? 'selected' : ''}>${escapeHtml(l.storeName)} (${escapeHtml(l.storeCode)})</option>`).join('')}
+            </select>
+          </div>
+          <div id="destLocationWrap" class="hidden">
+            <label class="required">Destination</label>
+            <select id="destLocation">
+              <option value="">-- Select destination --</option>
+              ${locations.map(l => `<option value="${escapeHtml(l.storeCode)}">${escapeHtml(l.storeName)} (${escapeHtml(l.storeCode)})</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div><label>LPO Number</label><input type="text" id="lpo"></div>
+          <div id="supplierWrap"><label>Supplier</label><input type="text" id="supplier"></div>
+          <div id="requesterWrap" class="hidden"><label>Requester</label><input type="text" id="requester"></div>
+          <div id="receiverWrap" class="hidden"><label>Receiver</label><input type="text" id="receiver"></div>
+        </div>
+
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="notes" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Items</h2>
+          <button class="btn btn-secondary btn-sm" onclick="addItemRow()">+ Add Row</button>
+        </div>
+
+        <div class="table-wrap items-table">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40px;">#</th>
+                <th style="width:200px;">Item Code</th>
+                <th>Name</th>
+                <th style="width:80px;">Unit</th>
+                <th style="width:120px;">Quantity</th>
+                <th style="width:40px;"></th>
+              </tr>
+            </thead>
+            <tbody id="itemsTbody"></tbody>
+          </table>
+        </div>
+
+        <div class="flex-gap" style="justify-content:flex-end; margin-top:1.25rem;">
+          <button class="btn btn-secondary" onclick="resetEntry()">Reset</button>
+          <button class="btn btn-success" id="submitBtn" onclick="submitEntry()">💾 Save Transaction</button>
+        </div>
+      </div>
+    `;
+
+    window.__entryRowIndex = 0;
+    addItemRow();
+    addItemRow();
+    addItemRow();
+    onTxnTypeChange();
+  }
+
+  function onTxnTypeChange() {
+    const type = document.getElementById('txnType').value;
+    const destWrap = document.getElementById('destLocationWrap');
+    const supplierWrap = document.getElementById('supplierWrap');
+    const requesterWrap = document.getElementById('requesterWrap');
+    const receiverWrap = document.getElementById('receiverWrap');
+
+    destWrap.classList.toggle('hidden', type !== 'Transfer');
+    supplierWrap.classList.toggle('hidden', type !== 'Receipt');
+    requesterWrap.classList.toggle('hidden', type !== 'Issuance' && type !== 'Transfer');
+    receiverWrap.classList.toggle('hidden', type !== 'Receipt' && type !== 'Transfer');
+  }
+
+  function addItemRow() {
+    const tbody = document.getElementById('itemsTbody');
+    const idx = ++window.__entryRowIndex;
+    const tr = document.createElement('tr');
+    tr.dataset.rowIdx = idx;
+    tr.innerHTML = `
+      <td>${idx}</td>
+      <td>
+        <div class="autocomplete-wrap">
+          <input type="text" class="item-code" placeholder="Search by code or name..." oninput="onItemCodeInput(this)" autocomplete="off">
+        </div>
+      </td>
+      <td><span class="item-name text-muted">—</span></td>
+      <td><span class="item-unit text-muted">—</span></td>
+      <td>
+        <input type="number" class="item-qty" step="any" oninput="onQtyInput(this)">
+        <div class="balance-hint"></div>
+      </td>
+      <td><button class="btn btn-secondary btn-sm" onclick="removeItemRow(this)" title="Remove row">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  function removeItemRow(btn) {
+    const tbody = document.getElementById('itemsTbody');
+    if (tbody.children.length > 1) {
+      btn.closest('tr').remove();
+    }
+  }
+
+  async function onItemCodeInput(input) {
+    const query = input.value.trim();
+    const wrap = input.parentElement;
+    let list = wrap.querySelector('.autocomplete-list');
+    if (!query || query.length < 1) {
+      if (list) list.remove();
+      clearItemRow(input.closest('tr'));
+      return;
+    }
+
+    const items = await getItems();
+    const q = query.toUpperCase();
+    const matches = items.filter(i =>
+      i.itemCode.toUpperCase().includes(q) || i.itemName.toUpperCase().includes(q)
+    ).slice(0, 8);
+
+    if (!list) {
+      list = document.createElement('div');
+      list.className = 'autocomplete-list';
+      wrap.appendChild(list);
+    }
+
+    if (matches.length === 0) {
+      list.innerHTML = '<div class="autocomplete-item text-muted">No matches</div>';
+      return;
+    }
+
+    list.innerHTML = matches.map(m => `
+      <div class="autocomplete-item" onclick="selectItem(this, '${escapeHtml(m.itemCode)}', '${escapeHtml(m.itemName)}', '${escapeHtml(m.unit)}', ${m.minStock})">
+        <span class="code">${escapeHtml(m.itemCode)}</span> — ${escapeHtml(m.itemName)} <span class="text-muted">(${escapeHtml(m.unit)})</span>
+      </div>
+    `).join('');
+  }
+
+  async function selectItem(el, code, name, unit, minStock) {
+    const tr = el.closest('tr');
+    tr.querySelector('.item-code').value = code;
+    tr.querySelector('.item-name').textContent = name;
+    tr.querySelector('.item-name').classList.remove('text-muted');
+    tr.querySelector('.item-unit').textContent = unit;
+    tr.querySelector('.item-unit').classList.remove('text-muted');
+    tr.dataset.itemCode = code;
+    tr.dataset.itemName = name;
+    tr.dataset.itemUnit = unit;
+    tr.dataset.minStock = minStock;
+    el.closest('.autocomplete-list').remove();
+
+    const txnType = document.getElementById('txnType').value;
+    const location = document.getElementById('sourceLocation').value;
+    if ((txnType === 'Issuance' || txnType === 'Transfer') && location) {
+      try {
+        const balance = await callApi('api_getBalance', code, location);
+        tr.dataset.balance = balance;
+        updateBalanceHint(tr);
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  function clearItemRow(tr) {
+    tr.querySelector('.item-name').textContent = '—';
+    tr.querySelector('.item-name').classList.add('text-muted');
+    tr.querySelector('.item-unit').textContent = '—';
+    tr.querySelector('.item-unit').classList.add('text-muted');
+    tr.querySelector('.balance-hint').textContent = '';
+    delete tr.dataset.itemCode;
+    delete tr.dataset.balance;
+  }
+
+  function onQtyInput(input) {
+    updateBalanceHint(input.closest('tr'));
+  }
+
+  function updateBalanceHint(tr) {
+    const hint = tr.querySelector('.balance-hint');
+    if (!tr.dataset.balance) { hint.textContent = ''; return; }
+    const balance = Number(tr.dataset.balance);
+    const qty = Number(tr.querySelector('.item-qty').value) || 0;
+    const minStock = Number(tr.dataset.minStock) || 0;
+    const txnType = document.getElementById('txnType').value;
+
+    if (txnType === 'Issuance' || txnType === 'Transfer') {
+      const remaining = balance - qty;
+      let cls = '';
+      let text = 'Available: ' + balance;
+      if (qty > balance) { cls = 'zero'; text = '⚠ Exceeds balance! Available: ' + balance; }
+      else if (qty > 0 && remaining < minStock && minStock > 0) { cls = 'low'; text = 'Remaining after: ' + remaining + ' (below min ' + minStock + ')'; }
+      else if (qty > 0) { text = 'Remaining after: ' + remaining; }
+      hint.className = 'balance-hint ' + cls;
+      hint.textContent = text;
+    } else if (txnType === 'Adjustment') {
+      hint.textContent = 'Current: ' + balance + ' (will be: ' + (balance + qty) + ')';
+    } else {
+      hint.textContent = '';
+    }
+  }
+
+  function collectPayload(confirmNeg) {
+    const lines = [];
+    document.querySelectorAll('#itemsTbody tr').forEach(tr => {
+      const code = (tr.querySelector('.item-code').value || '').trim();
+      const qty = tr.querySelector('.item-qty').value;
+      if (code && qty !== '') {
+        lines.push({
+          itemCode: code,
+          itemName: tr.dataset.itemName || '',
+          unit: tr.dataset.itemUnit || '',
+          qty: Number(qty)
+        });
+      }
+    });
+
+    return {
+      txnType:        document.getElementById('txnType').value,
+      date:           document.getElementById('txnDate').value,
+      sourceLocation: document.getElementById('sourceLocation').value,
+      destLocation:   document.getElementById('destLocation') ? document.getElementById('destLocation').value : '',
+      lpo:            document.getElementById('lpo').value,
+      supplier:       document.getElementById('supplier').value,
+      requester:      document.getElementById('requester').value,
+      receiver:       document.getElementById('receiver').value,
+      notes:          document.getElementById('notes').value,
+      lines:          lines,
+      confirmNegativeAdjustment: !!confirmNeg
+    };
+  }
+
+  async function submitEntry(confirmNeg) {
+    const payload = collectPayload(confirmNeg);
+    if (payload.lines.length === 0) {
+      renderEntryAlerts(['Add at least one item with a valid quantity'], [], 'error');
+      return;
+    }
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    showSpinner();
+
+    try {
+      const result = await callApi('api_submitTransaction', payload);
+      hideSpinner();
+      btn.disabled = false;
+
+      if (result.requiresConfirmation) {
+        const warnings = result.warnings.join('<br>');
+        showModal(`
+          <h3 class="text-warning">⚠ Confirmation Required</h3>
+          <div class="alert alert-warning">${warnings}</div>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-danger" onclick="closeModal(); submitEntry(true);">Proceed Anyway</button>
+          </div>
+        `);
+        return;
+      }
+
+      if (result.success) {
+        showToast('✓ Saved: ' + result.txnId, 'success');
+        renderEntryAlerts([], result.warnings, 'success', result.txnId);
+        clearCache();
+        resetEntry(true);
+      } else {
+        renderEntryAlerts(result.errors.map(e => (e.row ? 'Row ' + e.row + ': ' : '') + e.message), result.warnings, 'error');
+      }
+    } catch (e) {
+      hideSpinner();
+      btn.disabled = false;
+      renderEntryAlerts(['Error: ' + e.message], [], 'error');
+    }
+  }
+
+  function renderEntryAlerts(errors, warnings, type, txnId) {
+    const box = document.getElementById('entry-alerts');
+    let html = '';
+    if (errors && errors.length) {
+      html += '<div class="alert alert-error"><strong>❌ Cannot save transaction:</strong><ul>' +
+              errors.map(e => '<li>' + escapeHtml(e) + '</li>').join('') + '</ul></div>';
+    }
+    if (warnings && warnings.length) {
+      html += '<div class="alert alert-warning"><strong>⚠ Warnings:</strong><ul>' +
+              warnings.map(w => '<li>' + escapeHtml(w) + '</li>').join('') + '</ul></div>';
+    }
+    if (type === 'success' && txnId) {
+      html = '<div class="alert alert-success"><strong>✓ Transaction saved successfully</strong> — TxnID: <code>' + escapeHtml(txnId) + '</code></div>' + html;
+    }
+    box.innerHTML = html;
+    if (html) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function resetEntry(keepAlerts) {
+    document.querySelectorAll('#itemsTbody tr').forEach(tr => tr.remove());
+    window.__entryRowIndex = 0;
+    addItemRow();
+    addItemRow();
+    addItemRow();
+    document.getElementById('lpo').value = '';
+    document.getElementById('supplier').value = '';
+    document.getElementById('requester').value = '';
+    document.getElementById('receiver').value = '';
+    document.getElementById('notes').value = '';
+    document.getElementById('txnDate').value = todayString();
+    if (!keepAlerts) document.getElementById('entry-alerts').innerHTML = '';
+  }
+</script>

@@ -1,0 +1,129 @@
+<script>
+  // ─── Audit Log Viewer (Admin only) ─────────────────────────────
+  async function renderAuditView(container) {
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-header"><h2>🔍 Audit Log</h2></div>
+
+        <div class="form-row">
+          <div><label>From Date</label><input type="date" id="auditFrom"></div>
+          <div><label>To Date</label><input type="date" id="auditTo"></div>
+          <div><label>User (Email)</label><input type="text" id="auditUser" placeholder="Search..."></div>
+          <div>
+            <label>Action</label>
+            <select id="auditAction">
+              <option value="">All</option>
+              <option value="LOGIN">Login</option>
+              <option value="UNAUTHORIZED_ACCESS">Unauthorized Access</option>
+              <option value="TRANSACTION_SUBMITTED">Transaction Submitted</option>
+              <option value="TRANSACTION_REJECTED">Transaction Rejected</option>
+              <option value="USER_ADDED">User Added</option>
+              <option value="USER_UPDATED">User Updated</option>
+              <option value="USER_DEACTIVATED">User Deactivated</option>
+              <option value="ITEM_ADDED">Item Added</option>
+              <option value="ITEM_UPDATED">Item Updated</option>
+              <option value="LOCATION_ADDED">Location Added</option>
+              <option value="SYSTEM_SETUP">System Setup</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex-gap mb-2">
+          <button class="btn btn-primary" onclick="loadAudit()">🔍 Search</button>
+          <button class="btn btn-secondary" onclick="clearAuditFilters()">Clear Filters</button>
+        </div>
+
+        <div id="auditResults"></div>
+      </div>
+    `;
+    await loadAudit();
+  }
+
+  async function loadAudit() {
+    const filters = {
+      dateFrom:  document.getElementById('auditFrom').value || null,
+      dateTo:    document.getElementById('auditTo').value || null,
+      userEmail: document.getElementById('auditUser').value || null,
+      action:    document.getElementById('auditAction').value || null,
+      limit:     500
+    };
+    document.getElementById('auditResults').innerHTML = '<div class="text-center"><div class="spinner"></div></div>';
+    try {
+      const rows = await callApi('api_getAuditLog', filters);
+      renderAuditTable(rows);
+    } catch (e) {
+      document.getElementById('auditResults').innerHTML = '<div class="alert alert-error">' + escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  function clearAuditFilters() {
+    ['auditFrom', 'auditTo', 'auditUser', 'auditAction'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    loadAudit();
+  }
+
+  function actionLabel(action) {
+    const map = {
+      LOGIN: 'Login',
+      UNAUTHORIZED_ACCESS: 'Unauthorized Access',
+      TRANSACTION_SUBMITTED: 'Transaction Submitted',
+      TRANSACTION_REJECTED: 'Transaction Rejected',
+      USER_ADDED: 'User Added',
+      USER_UPDATED: 'User Updated',
+      USER_DEACTIVATED: 'User Deactivated',
+      ITEM_ADDED: 'Item Added',
+      ITEM_UPDATED: 'Item Updated',
+      LOCATION_ADDED: 'Location Added',
+      SYSTEM_SETUP: 'System Setup'
+    };
+    return map[action] || action;
+  }
+
+  function actionBadgeClass(action) {
+    if (action === 'UNAUTHORIZED_ACCESS' || action === 'TRANSACTION_REJECTED' || action === 'USER_DEACTIVATED') return 'badge badge-zero';
+    if (action === 'TRANSACTION_SUBMITTED' || action === 'USER_ADDED' || action === 'ITEM_ADDED' || action === 'LOCATION_ADDED') return 'badge badge-ok';
+    if (action === 'LOGIN') return 'badge badge-keeper';
+    return 'badge badge-admin';
+  }
+
+  function renderAuditTable(rows) {
+    const box = document.getElementById('auditResults');
+    if (rows.length === 0) {
+      box.innerHTML = '<div class="text-center text-muted" style="padding:2rem;">No log entries</div>';
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="mb-1 text-muted" style="font-size:0.85rem;">Total: ${rows.length} entries</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:160px;">Timestamp</th>
+              <th>User</th>
+              <th>Action</th>
+              <th>Entity</th>
+              <th>Entity ID</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr>
+                <td class="text-muted" style="font-size:0.82rem;white-space:nowrap;">${formatDateTime(r.timestamp)}</td>
+                <td><code style="font-size:0.8rem;">${escapeHtml(r.userEmail || '—')}</code></td>
+                <td><span class="${actionBadgeClass(r.action)}">${escapeHtml(actionLabel(r.action))}</span></td>
+                <td>${escapeHtml(r.entity || '—')}</td>
+                <td><code>${escapeHtml(r.entityId || '—')}</code></td>
+                <td style="font-size:0.8rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(r.details || '')}">
+                  ${r.details ? '<code class="text-muted">' + escapeHtml(r.details.substring(0, 80)) + (r.details.length > 80 ? '…' : '') + '</code>' : '<span class="text-muted">—</span>'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+</script>

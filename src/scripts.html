@@ -1,0 +1,188 @@
+<script>
+  // ─── Global state ──────────────────────────────────────
+  const App = {
+    user: null,
+    currentView: null,
+    cache: {
+      items: null,
+      locations: null
+    }
+  };
+
+  // ─── Toast notifications ───────────────────────────────
+  function showToast(message, type) {
+    type = type || 'info';
+    const container = document.getElementById('toast-container') || createToastContainer();
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s';
+      setTimeout(() => toast.remove(), 300);
+    }, 3500);
+  }
+
+  function createToastContainer() {
+    const c = document.createElement('div');
+    c.id = 'toast-container';
+    c.className = 'toast-container';
+    document.body.appendChild(c);
+    return c;
+  }
+
+  // ─── Loading spinner ───────────────────────────────────
+  function showSpinner() {
+    if (document.getElementById('global-spinner')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'global-spinner';
+    overlay.className = 'spinner-overlay';
+    overlay.innerHTML = '<div class="spinner"></div>';
+    document.body.appendChild(overlay);
+  }
+
+  function hideSpinner() {
+    const el = document.getElementById('global-spinner');
+    if (el) el.remove();
+  }
+
+  // ─── API bridge to google.script.run ───────────────────
+  function callApi(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(err => reject(new Error(err.message || 'Failed to reach the server')))
+        [functionName](...args);
+    });
+  }
+
+  // ─── Cached lookups ────────────────────────────────────
+  async function getItems() {
+    if (App.cache.items) return App.cache.items;
+    App.cache.items = await callApi('api_getMasterItems');
+    return App.cache.items;
+  }
+
+  async function getLocations() {
+    if (App.cache.locations) return App.cache.locations;
+    App.cache.locations = await callApi('api_getLocations');
+    return App.cache.locations;
+  }
+
+  function clearCache() {
+    App.cache.items = null;
+    App.cache.locations = null;
+  }
+
+  // ─── View routing ──────────────────────────────────────
+  async function navigate(view) {
+    App.currentView = view;
+    document.querySelectorAll('.nav-link').forEach(el => {
+      el.classList.toggle('active', el.dataset.view === view);
+    });
+    const content = document.getElementById('content');
+    content.innerHTML = '<div class="text-center" style="padding:3rem;"><div class="spinner"></div></div>';
+
+    try {
+      switch (view) {
+        case 'entry':     await renderEntryView(content); break;
+        case 'stock':     await renderStockView(content); break;
+        case 'history':   await renderHistoryView(content); break;
+        case 'dashboard': await renderDashboardView(content); break;
+        case 'ledger':    await renderLedgerView(content); break;
+        case 'allstock':  await renderAllStockView(content); break;
+        case 'admin':     await renderAdminView(content); break;
+        case 'audit':     await renderAuditView(content); break;
+        default:
+          content.innerHTML = '<div class="card"><p>Unknown view</p></div>';
+      }
+    } catch (e) {
+      content.innerHTML = '<div class="alert alert-error">Error: ' + escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  // ─── Utility ───────────────────────────────────────────
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatDate(d) {
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return '';
+    const day = String(dt.getDate()).padStart(2, '0');
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const year = dt.getFullYear();
+    return year + '-' + month + '-' + day;
+  }
+
+  function formatDateTime(d) {
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return '';
+    return formatDate(d) + ' ' + String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+  }
+
+  function todayString() {
+    const d = new Date();
+    return d.getFullYear() + '-' +
+           String(d.getMonth() + 1).padStart(2, '0') + '-' +
+           String(d.getDate()).padStart(2, '0');
+  }
+
+  function txnTypeLabel(type) {
+    return type || '';
+  }
+
+  function txnTypeBadgeClass(type) {
+    return 'badge badge-' + (type || '').toLowerCase();
+  }
+
+  function statusBadge(status) {
+    const map = {
+      OK:   '<span class="badge badge-ok">✓ OK</span>',
+      LOW:  '<span class="badge badge-low">⚠ Low</span>',
+      ZERO: '<span class="badge badge-zero">✗ Out</span>'
+    };
+    return map[status] || '';
+  }
+
+  function roleLabel(role) {
+    return role || '';
+  }
+
+  function roleBadgeClass(role) {
+    return 'badge badge-' + (role || '').toLowerCase();
+  }
+
+  // ─── Modal helpers ─────────────────────────────────────
+  function showModal(html) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.id = 'app-modal';
+    backdrop.innerHTML = '<div class="modal" onclick="event.stopPropagation()">' + html + '</div>';
+    backdrop.addEventListener('click', closeModal);
+    document.body.appendChild(backdrop);
+  }
+
+  function closeModal() {
+    const m = document.getElementById('app-modal');
+    if (m) m.remove();
+  }
+
+  // ─── Initial bootstrap ─────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function() {
+    const initialView = App.user && App.user.role === 'Admin' ? 'dashboard' : 'entry';
+    navigate(initialView);
+  });
+
+  window.navigate = navigate;
+  window.closeModal = closeModal;
+</script>

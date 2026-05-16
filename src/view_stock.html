@@ -14,12 +14,8 @@
     const categories = [...new Set(stock.map(s => s.category).filter(Boolean))].sort();
     const units      = [...new Set(stock.map(s => s.unit).filter(Boolean))].sort();
 
-    const locOptions = isAdmin
-      ? ['<option value="">All Stores</option>',
-         ...locations.map(l =>
-           `<option value="${escapeHtml(l.storeCode)}">${escapeHtml(l.storeName)} (${escapeHtml(l.storeCode)})</option>`)
-        ].join('')
-      : '';
+    // Store chips — all selected by default
+    window.__stockSelectedLocs = new Set(locations.map(l => l.storeCode));
 
     container.innerHTML = `
       <div class="card">
@@ -46,11 +42,17 @@
             </div>
 
             ${isAdmin ? `
-            <div class="filter-field">
+            <div class="filter-field" style="flex:none;">
               <label>Store</label>
-              <select id="stockLocFilter" onchange="applyStockFilters()">
-                ${locOptions}
-              </select>
+              <div class="store-chips" id="stockLocChips">
+                ${locations.map(l => `
+                  <button class="store-chip active"
+                          data-loc="${escapeHtml(l.storeCode)}"
+                          onclick="toggleStockLoc('${escapeHtml(l.storeCode)}')"
+                          title="${escapeHtml(l.storeName)}">
+                    ${escapeHtml(l.storeCode)}
+                  </button>`).join('')}
+              </div>
             </div>` : ''}
 
             <div class="filter-field">
@@ -143,13 +145,37 @@
     if (!noRefresh) applyStockFilters();
   }
 
+  // ── Toggle a store chip ──────────────────────────────────────────
+  function toggleStockLoc(storeCode) {
+    const sel = window.__stockSelectedLocs;
+    if (sel.has(storeCode)) {
+      // Don't allow deselecting all
+      if (sel.size === 1) return;
+      sel.delete(storeCode);
+    } else {
+      sel.add(storeCode);
+    }
+    // Update chip appearance
+    document.querySelectorAll('#stockLocChips .store-chip').forEach(function(chip) {
+      chip.classList.toggle('active', sel.has(chip.dataset.loc));
+    });
+    applyStockFilters();
+  }
+
   // ── Reset all filters ────────────────────────────────────────────
   function resetStockFilters() {
-    ['stockSearch', 'stockCatFilter', 'stockUnitFilter', 'stockLocFilter',
+    ['stockSearch', 'stockCatFilter', 'stockUnitFilter',
      'stockBalMin', 'stockBalMax', 'stockMinStockFilter'].forEach(function(id) {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
+    // Re-select all stores
+    if (window.__stockSelectedLocs) {
+      document.querySelectorAll('#stockLocChips .store-chip').forEach(function(chip) {
+        window.__stockSelectedLocs.add(chip.dataset.loc);
+        chip.classList.add('active');
+      });
+    }
     setStockFilter('instock');
   }
 
@@ -164,7 +190,6 @@
   // ── Combined filter + sort + render ─────────────────────────────
   function applyStockFilters() {
     const search       = (document.getElementById('stockSearch')         ? document.getElementById('stockSearch').value         : '').toLowerCase();
-    const locFilter    =  document.getElementById('stockLocFilter')       ? document.getElementById('stockLocFilter').value       : '';
     const catFilter    =  document.getElementById('stockCatFilter')       ? document.getElementById('stockCatFilter').value       : '';
     const unitFilter   =  document.getElementById('stockUnitFilter')      ? document.getElementById('stockUnitFilter').value      : '';
     const balMinRaw    =  document.getElementById('stockBalMin')          ? document.getElementById('stockBalMin').value          : '';
@@ -172,6 +197,7 @@
     const minStockMode =  document.getElementById('stockMinStockFilter')  ? document.getElementById('stockMinStockFilter').value  : '';
     const filter       =  window.__stockFilter || 'instock';
     const { col, dir } =  window.__stockSort;
+    const selectedLocs =  window.__stockSelectedLocs;
 
     const balMin = balMinRaw !== '' ? Number(balMinRaw) : null;
     const balMax = balMaxRaw !== '' ? Number(balMaxRaw) : null;
@@ -182,8 +208,8 @@
     if (filter === 'instock') rows = rows.filter(s => s.balance > 0);
     else if (filter === 'alerts') rows = rows.filter(s => s.status !== 'OK');
 
-    // Location
-    if (locFilter) rows = rows.filter(s => s.location === locFilter);
+    // Store chips (Admin only — selectedLocs is undefined for Keeper)
+    if (selectedLocs) rows = rows.filter(s => selectedLocs.has(s.location));
 
     // Category
     if (catFilter) rows = rows.filter(s => (s.category || '') === catFilter);

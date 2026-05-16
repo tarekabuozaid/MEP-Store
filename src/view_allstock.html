@@ -57,6 +57,19 @@
               </div>
             </div>
 
+            <div class="filter-field" style="flex:none;">
+              <label>Stores</label>
+              <div class="store-chips" id="allStockLocChips">
+                ${locations.map(l => `
+                  <button class="store-chip active"
+                          data-loc="${escapeHtml(l.storeCode)}"
+                          onclick="toggleAllStockLoc('${escapeHtml(l.storeCode)}')"
+                          title="${escapeHtml(l.storeName)}">
+                    ${escapeHtml(l.storeCode)}
+                  </button>`).join('')}
+              </div>
+            </div>
+
             <div class="filter-field">
               <label>Category</label>
               <select id="allCatFilter" onchange="applyAllStockFilters()">
@@ -128,12 +141,28 @@
       </div>
     `;
 
-    window.__allStockData      = Object.values(itemMap);
-    window.__allStockLocations = locations;
-    window.__allStockSort      = { col: 'total', dir: -1 };
-    window.__allStockFilter    = 'instock';
+    window.__allStockData        = Object.values(itemMap);
+    window.__allStockLocations   = locations;
+    window.__allStockSort        = { col: 'total', dir: -1 };
+    window.__allStockFilter      = 'instock';
+    window.__allStockSelectedLocs = new Set(locations.map(l => l.storeCode));
 
     setAllStockFilter('instock', false);
+  }
+
+  // ── Toggle a store column ─────────────────────────────────────────
+  function toggleAllStockLoc(storeCode) {
+    const sel = window.__allStockSelectedLocs;
+    if (sel.has(storeCode)) {
+      if (sel.size === 1) return;   // keep at least one
+      sel.delete(storeCode);
+    } else {
+      sel.add(storeCode);
+    }
+    document.querySelectorAll('#allStockLocChips .store-chip').forEach(function(chip) {
+      chip.classList.toggle('active', sel.has(chip.dataset.loc));
+    });
+    applyAllStockFilters();
   }
 
   // ── Quick-filter ─────────────────────────────────────────────────
@@ -153,6 +182,11 @@
      'allBalMin', 'allBalMax'].forEach(function(id) {
       const el = document.getElementById(id);
       if (el) el.value = '';
+    });
+    // Re-select all stores
+    document.querySelectorAll('#allStockLocChips .store-chip').forEach(function(chip) {
+      window.__allStockSelectedLocs.add(chip.dataset.loc);
+      chip.classList.add('active');
     });
     setAllStockFilter('instock');
   }
@@ -225,33 +259,53 @@
     renderAllStockRows(items);
   }
 
-  // ── Table rows ────────────────────────────────────────────────────
+  // ── Table rows (only visible store columns) ─────────────────────
   function renderAllStockRows(items) {
     const tbody     = document.getElementById('allStockTbody');
-    const locations = window.__allStockLocations;
-    const colCount  = 6 + locations.length;
+    const allLocs   = window.__allStockLocations;
+    const sel       = window.__allStockSelectedLocs;
+    const visLocs   = allLocs.filter(l => sel.has(l.storeCode));
+    const colCount  = 6 + visLocs.length;
+
+    // Re-render thead to match visible columns
+    const thead = tbody.closest('table').querySelector('thead tr');
+    if (thead) {
+      thead.innerHTML = `
+        <th onclick="sortAllStock('itemCode')"  style="cursor:pointer;">Code ↕</th>
+        <th>Item</th>
+        <th onclick="sortAllStock('category')"  style="cursor:pointer;">Category ↕</th>
+        <th>Unit</th>
+        ${visLocs.map(l => `<th class="text-end">${escapeHtml(l.storeName)}<br><small class="text-muted">${escapeHtml(l.storeCode)}</small></th>`).join('')}
+        <th class="text-end" onclick="sortAllStock('total')" style="cursor:pointer;background:#1d4ed8;color:#fff;">Total ↕</th>
+        <th class="text-end">Min</th>
+      `;
+    }
 
     if (items.length === 0) {
       tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted" style="padding:2rem;">No items match the current filters</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = items.map(i => `
-      <tr>
-        <td><code>${escapeHtml(i.itemCode)}</code></td>
-        <td>${escapeHtml(i.itemName)}</td>
-        <td class="text-muted" style="font-size:0.83rem;">${escapeHtml(i.category || '—')}</td>
-        <td>${escapeHtml(i.unit)}</td>
-        ${locations.map(l => {
-          const b    = i.balances[l.storeCode] || { balance: 0, status: 'ZERO' };
-          const bold = b.balance > 0
-            ? '<strong>' + b.balance + '</strong>'
-            : '<span style="opacity:0.3;">0</span>';
-          return `<td class="text-end">${bold}</td>`;
-        }).join('')}
-        <td class="text-end" style="background:#eff6ff;"><strong>${i.total || 0}</strong></td>
-        <td class="text-end text-muted">${i.minStock || '—'}</td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = items.map(i => {
+      // Recalculate total for visible stores only
+      const visTotal = visLocs.reduce((sum, l) => sum + ((i.balances[l.storeCode] || {}).balance || 0), 0);
+      return `
+        <tr>
+          <td><code>${escapeHtml(i.itemCode)}</code></td>
+          <td>${escapeHtml(i.itemName)}</td>
+          <td class="text-muted" style="font-size:0.83rem;">${escapeHtml(i.category || '—')}</td>
+          <td>${escapeHtml(i.unit)}</td>
+          ${visLocs.map(l => {
+            const b    = i.balances[l.storeCode] || { balance: 0 };
+            const bold = b.balance > 0
+              ? '<strong>' + b.balance + '</strong>'
+              : '<span style="opacity:0.3;">0</span>';
+            return `<td class="text-end">${bold}</td>`;
+          }).join('')}
+          <td class="text-end" style="background:#eff6ff;"><strong>${visTotal}</strong></td>
+          <td class="text-end text-muted">${i.minStock || '—'}</td>
+        </tr>
+      `;
+    }).join('');
   }
 </script>

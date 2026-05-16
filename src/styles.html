@@ -194,6 +194,28 @@
   .btn-group .btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
   .btn-group .btn:last-child  { border-radius: 0 var(--radius) var(--radius) 0; border-right-width: 1px; }
 
+  /* ─── Store chips ───────────────────────────────────── */
+  .store-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .store-chip {
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--color-border);
+    background: white;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+  .store-chip:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .store-chip.active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
+  }
+
   /* ─── Filter panel ──────────────────────────────────── */
   .filter-panel {
     background: #f8fafc;

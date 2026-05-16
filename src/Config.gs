@@ -8,7 +8,7 @@
 const CONFIG = {
   // Set to null to use the active spreadsheet (when bound).
   // Set to a string ID to use a specific spreadsheet from a standalone script.
-  SPREADSHEET_ID: null,
+  SPREADSHEET_ID: '1pavGKYRZeGR71Gi4l_FAWwAT5SesKBNR7YZsRD87l6U',
 
   // Sheet names — must match exactly
   SHEETS: {

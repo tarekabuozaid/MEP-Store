@@ -15,14 +15,19 @@ const AdminService = (function() {
     if (lastRow < 2) return [];
 
     const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
-    return data.map(row => ({
-      email:     String(row[0] || '').trim(),
-      storeCode: String(row[1] || '').trim(),
-      role:      String(row[2] || '').trim(),
-      fullName:  String(row[3] || '').trim(),
-      isActive:  row[4] === true || String(row[4]).toUpperCase() === 'TRUE',
-      addedDate: row[5]
-    })).filter(u => u.email);
+    return data.map(function(row) {
+      var d = row[5];
+      var addedDate = '';
+      if (d) { try { addedDate = new Date(d).toISOString().split('T')[0]; } catch(e) { addedDate = String(d); } }
+      return {
+        email:     String(row[0] || '').trim(),
+        storeCode: String(row[1] || '').trim(),
+        role:      String(row[2] || '').trim(),
+        fullName:  String(row[3] || '').trim(),
+        isActive:  row[4] === true || String(row[4]).toUpperCase() === 'TRUE',
+        addedDate: addedDate
+      };
+    }).filter(function(u) { return u.email; });
   }
 
   function addUser(userData) {

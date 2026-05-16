@@ -80,73 +80,95 @@ const DataService = (function() {
     if (lastRow < 2) return [];
 
     const data = sheet.getRange(2, 1, lastRow - 1, 15).getValues();
-    return data.map(row => ({
-      txnId:     String(row[0] || ''),
-      date:      row[1],
-      txnType:   String(row[2] || ''),
-      itemCode:  String(row[3] || '').trim(),
-      itemName:  String(row[4] || ''),
-      unit:      String(row[5] || ''),
-      qty:       Number(row[6]) || 0,
-      location:  String(row[7] || '').trim(),
-      lpo:       String(row[8] || ''),
-      supplier:  String(row[9] || ''),
-      requester: String(row[10] || ''),
-      receiver:  String(row[11] || ''),
-      notes:     String(row[12] || ''),
-      userEmail: String(row[13] || ''),
-      timestamp: row[14]
-    })).filter(r => r.itemCode);
+    // Convert Date objects to ISO strings so google.script.run can serialize them
+    function toDateStr(v) {
+      if (!v) return '';
+      try { return new Date(v).toISOString().split('T')[0]; } catch(e) { return String(v); }
+    }
+    function toTsStr(v) {
+      if (!v) return '';
+      try { return new Date(v).toISOString(); } catch(e) { return String(v); }
+    }
+
+    return data.map(function(row) {
+      return {
+        txnId:     String(row[0] || ''),
+        date:      toDateStr(row[1]),
+        txnType:   String(row[2] || ''),
+        itemCode:  String(row[3] || '').trim(),
+        itemName:  String(row[4] || ''),
+        unit:      String(row[5] || ''),
+        qty:       Number(row[6]) || 0,
+        location:  String(row[7] || '').trim(),
+        lpo:       String(row[8] || ''),
+        supplier:  String(row[9] || ''),
+        requester: String(row[10] || ''),
+        receiver:  String(row[11] || ''),
+        notes:     String(row[12] || ''),
+        userEmail: String(row[13] || ''),
+        timestamp: toTsStr(row[14])
+      };
+    }).filter(function(r) { return r.itemCode; });
   }
 
   /**
-   * Calculate the current balance for an item at a location.
+   * Single-pass balance computation — O(movements) instead of O(items×locations×movements).
+   * Returns a map: "ITEMCODE:LOCATION" → balance number.
+   * Always call this once and share the result; never call getBalance() in a loop over items.
+   */
+  function computeAllBalances(movements) {
+    const map = {};
+    const data = movements || getStockMovementData();
+    data.forEach(function(row) {
+      const itemUp = row.itemCode.toUpperCase();
+      const locUp  = row.location.toUpperCase();
+      const key    = itemUp + ':' + locUp;
+      if (!map[key]) map[key] = 0;
+
+      if (row.txnType === CONFIG.TXN_TYPES.TRANSFER) {
+        if (row.txnId.endsWith('-OUT')) { map[key] -= row.qty; }
+        else if (row.txnId.endsWith('-IN'))  { map[key] += row.qty; }
+      } else if (row.txnType === CONFIG.TXN_TYPES.RECEIPT)    { map[key] += row.qty; }
+        else if (row.txnType === CONFIG.TXN_TYPES.ISSUANCE)   { map[key] -= row.qty; }
+        else if (row.txnType === CONFIG.TXN_TYPES.ADJUSTMENT) { map[key] += row.qty; }
+    });
+    return map;
+  }
+
+  /**
+   * Calculate the current balance for ONE item at ONE location.
+   * For bulk lookups use computeAllBalances() instead.
    * @param {string} itemCode
    * @param {string} location
-   * @param {Array} [cachedData] - Optionally pass pre-loaded data
+   * @param {Array} [cachedData]
    * @returns {number}
    */
   function getBalance(itemCode, location, cachedData) {
-    const data = cachedData || getStockMovementData();
-    const itemUpper = String(itemCode).trim().toUpperCase();
-    const locUpper = String(location).trim().toUpperCase();
-
-    return data.reduce((bal, row) => {
-      if (row.itemCode.toUpperCase() !== itemUpper) return bal;
-
-      // Transfer: check the -OUT / -IN suffix
-      if (row.txnType === CONFIG.TXN_TYPES.TRANSFER) {
-        if (row.location.toUpperCase() !== locUpper) return bal;
-        if (row.txnId.endsWith('-OUT')) return bal - row.qty;
-        if (row.txnId.endsWith('-IN'))  return bal + row.qty;
-        return bal;
-      }
-
-      if (row.location.toUpperCase() !== locUpper) return bal;
-
-      if (row.txnType === CONFIG.TXN_TYPES.RECEIPT)    return bal + row.qty;
-      if (row.txnType === CONFIG.TXN_TYPES.ISSUANCE)   return bal - row.qty;
-      if (row.txnType === CONFIG.TXN_TYPES.ADJUSTMENT) return bal + row.qty;
-      return bal;
-    }, 0);
+    const map = computeAllBalances(cachedData);
+    const key = String(itemCode).trim().toUpperCase() + ':' + String(location).trim().toUpperCase();
+    return map[key] || 0;
   }
 
   /**
    * Get the full stock view for a location (or all if '*').
+   * Uses single-pass balance computation — O(movements + items×locations).
    * @param {string} location - '*' for all
    * @returns {Array<Object>} [{itemCode, itemName, unit, location, balance, minStock, status}]
    */
   function getStockByLocation(location) {
-    const items = getMasterItems(true);
+    const items     = getMasterItems(true);
     const movements = getStockMovementData();
+    const balMap    = computeAllBalances(movements);            // single pass
     const locations = (location === CONFIG.ADMIN_STORE_CODE)
-      ? getLocations(true).map(l => l.storeCode)
+      ? getLocations(true).map(function(l) { return l.storeCode; })
       : [location];
 
+    // Only include items that have at least one movement (skip 0-balance items for all-stores view)
     const result = [];
-    items.forEach(item => {
-      locations.forEach(loc => {
-        const balance = getBalance(item.itemCode, loc, movements);
+    items.forEach(function(item) {
+      locations.forEach(function(loc) {
+        const key     = item.itemCode.toUpperCase() + ':' + loc.toUpperCase();
+        const balance = balMap[key] || 0;
         let status = 'OK';
         if (balance <= 0) status = 'ZERO';
         else if (balance < item.minStock) status = 'LOW';
@@ -222,6 +244,7 @@ const DataService = (function() {
     getLocations: getLocations,
     isValidLocation: isValidLocation,
     getStockMovementData: getStockMovementData,
+    computeAllBalances: computeAllBalances,   // exposed for ReportService
     getBalance: getBalance,
     getStockByLocation: getStockByLocation,
     getTransactions: getTransactions

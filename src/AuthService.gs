@@ -34,7 +34,7 @@ const AuthService = (function() {
           role:      String(row[2] || '').trim(),
           fullName:  String(row[3] || '').trim(),
           isActive:  true,
-          addedDate: row[5]
+          addedDate: row[5] ? (function(v){ try { return new Date(v).toISOString().split('T')[0]; } catch(e){ return String(v); } })(row[5]) : ''
         };
       }
     }

@@ -3,6 +3,10 @@
   async function renderDashboardView(container) {
     container.innerHTML = '<div class="card"><div class="text-center"><div class="spinner"></div></div></div>';
     const data = await callApi('api_getDashboardData');
+    if (!data) {
+      container.innerHTML = '<div class="alert alert-error">⚠ Dashboard data could not be loaded. The server returned null — possible timeout or Date serialization error. Please try refreshing.</div>';
+      return;
+    }
 
     container.innerHTML = `
       <div class="card-header" style="background:none;border:none;padding:0;margin-bottom:1rem;">

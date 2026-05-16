@@ -12,48 +12,49 @@ const ReportService = (function() {
   function getDashboardData() {
     AuthService.requireRole([CONFIG.ROLES.ADMIN, CONFIG.ROLES.VIEWER]);
 
-    const movements = DataService.getStockMovementData();
-    const items = DataService.getMasterItems(true);
-    const locations = DataService.getLocations(true);
+    const movements  = DataService.getStockMovementData();
+    const items      = DataService.getMasterItems(true);
+    const locations  = DataService.getLocations(true);
+    // Single-pass balance map: "ITEMCODE:LOCATION" → number
+    const balMap     = DataService.computeAllBalances(movements);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     // Today's transactions
-    const todayTxns = movements.filter(m => {
+    const todayTxns = movements.filter(function(m) {
       if (!m.timestamp) return false;
       const t = new Date(m.timestamp);
       t.setHours(0, 0, 0, 0);
       return t.getTime() === today.getTime();
     });
 
-    const todayByType = {
-      Receipt: 0, Issuance: 0, Adjustment: 0, Transfer: 0
-    };
-    todayTxns.forEach(t => {
+    const todayByType = { Receipt: 0, Issuance: 0, Adjustment: 0, Transfer: 0 };
+    todayTxns.forEach(function(t) {
       if (t.txnType === CONFIG.TXN_TYPES.TRANSFER) {
-        // Count each transfer once (OUT side)
         if (t.txnId.endsWith('-OUT')) todayByType.Transfer++;
       } else {
         todayByType[t.txnType] = (todayByType[t.txnType] || 0) + 1;
       }
     });
 
-    // Low stock across all locations
+    // Low stock — O(items × locations) using pre-computed balMap
     const lowStockItems = [];
-    items.forEach(item => {
-      locations.forEach(loc => {
-        const balance = DataService.getBalance(item.itemCode, loc.storeCode, movements);
-        if (item.minStock > 0 && balance < item.minStock) {
+    items.forEach(function(item) {
+      if (item.minStock <= 0) return;           // skip items with no minimum set
+      locations.forEach(function(loc) {
+        const key     = item.itemCode.toUpperCase() + ':' + loc.storeCode.toUpperCase();
+        const balance = balMap[key] || 0;
+        if (balance < item.minStock) {
           lowStockItems.push({
-            itemCode: item.itemCode,
-            itemName: item.itemName,
-            unit: item.unit,
-            location: loc.storeCode,
+            itemCode:     item.itemCode,
+            itemName:     item.itemName,
+            unit:         item.unit,
+            location:     loc.storeCode,
             locationName: loc.storeName,
-            balance: balance,
-            minStock: item.minStock,
-            status: balance <= 0 ? 'ZERO' : 'LOW'
+            balance:      balance,
+            minStock:     item.minStock,
+            status:       balance <= 0 ? 'ZERO' : 'LOW'
           });
         }
       });

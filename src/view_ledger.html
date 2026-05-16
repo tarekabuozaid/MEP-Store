@@ -54,13 +54,17 @@
       itemCode: document.getElementById('ledItem').value || null,
       limit:    1000
     };
-    document.getElementById('ledgerResults').innerHTML = '<div class="text-center"><div class="spinner"></div></div>';
+    const resultsEl = document.getElementById('ledgerResults');
+    if (!resultsEl) return;
+    resultsEl.innerHTML = '<div class="text-center"><div class="spinner"></div></div>';
     try {
       const rows = await callApi('api_getLedger', filters);
+      if (!rows) throw new Error('Server returned null — refresh the page and try again');
       renderLedgerTable(rows);
       window.__lastLedgerFilters = filters;
     } catch (e) {
-      document.getElementById('ledgerResults').innerHTML = '<div class="alert alert-error">' + escapeHtml(e.message) + '</div>';
+      const el = document.getElementById('ledgerResults');
+      if (el) el.innerHTML = '<div class="alert alert-error">' + escapeHtml(e.message) + '</div>';
     }
   }
 

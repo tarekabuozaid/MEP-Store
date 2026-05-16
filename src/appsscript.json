@@ -3,7 +3,7 @@
   "dependencies": {},
   "webapp": {
     "executeAs": "USER_DEPLOYING",
-    "access": "ANYONE_WITH_GOOGLE_ACCOUNT"
+    "access": "ANYONE"
   },
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",

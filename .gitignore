@@ -33,3 +33,9 @@ package-lock.json
 # Backups
 *.bak
 *.tmp
+
+# Local Backend paste exports (contain live inventory snapshots)
+tools/output_backend_paste/
+
+# نسخة مجلّد مكرّرة داخل الجذر (استنساخ/نسخ خطأ المسار) — العمل دائماً على جذر المستودع
+/MEP-Store/

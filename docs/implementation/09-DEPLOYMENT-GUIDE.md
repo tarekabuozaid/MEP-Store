@@ -7,7 +7,7 @@
 
 - [ ] حساب Google (Gmail) للمالك/الأدمن
 - [ ] متصفح Chrome أو Firefox
-- [ ] (اختياري) Node.js + `clasp` CLI للتطوير المحلي
+- [ ] (للتطوير المحلي) Node.js npm + **`@google/clasp`** — راجع قسم «النشر عبر clasp» أدناه
 
 ---
 
@@ -107,44 +107,70 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
 
 ### الخطوة 2.2 — إنشاء ملفات المشروع
 
-في محرر Apps Script، أنشئ هذه الملفات (Script files):
-- `Code.gs`
-- `AuthService.gs`
-- `TransactionService.gs`
-- `DataService.gs`
-- `AdminService.gs`
-- `ReportService.gs`
-- `LockService.gs`
-- `AuditService.gs`
+**المستودع المرجعي (MEP-Store):** المصدر الموحَّد هو مجلّد `src/` في [MEP-Store على GitHub](https://github.com/tarekabuozaid/MEP-Store).
 
-وهذه ملفات HTML:
-- `Index.html`
-- `Dashboard.html`
-- `Entry.html`
-- `Stock.html`
-- `Ledger.html`
-- `Admin.html`
+ملفات **`.gs`** (Script):
+- `Config.gs` — إعدادات (مثل `SPREADSHEET_ID`)
+- `setup.gs` — مهام الإعداد الأولي (إن وُجدت)
+- `Code.gs` — نقطة الدخول (`doGet` / `doPost`)
+- `AuthService.gs`، `LockService.gs`، `AuditService.gs`
+- `DataService.gs`، `TransactionService.gs`
+- `AdminService.gs`، `ReportService.gs`
+
+ملفات **HTML** (واجهة `HtmlService` + أجزاء):
+- `Index.html`، `styles.html`، `scripts.html`
 - `ErrorUnauthorized.html`
-- `styles.html`
-- `scripts.html`
+- `view_entry.html`، `view_stock.html`، `view_history.html`، `view_dashboard.html`
+- `view_ledger.html`، `view_allstock.html`، `view_admin.html`، `view_audit.html`
+
+يمكن النسخ يدوياً إلى محرر Apps Script أو **دفع كل المجلّد بواسطة `clasp`** (انظر القسم التالي).
 
 ### الخطوة 2.3 — إعداد manifest (appsscript.json)
 
-في محرر Apps Script، افتح `appsscript.json` (من View → Show manifest):
+في محرر Apps Script، افتح `appsscript.json` (من View → Show manifest).  
+في **`webapp.access`** لا تُستخدم قيم خارج [قائمة Google الرسمية](https://developers.google.com/apps-script/manifest/web-app-api-executable):  
+`MYSELF`، `DOMAIN`، **`ANYONE`**، `ANYONE_ANONYMOUS`.
+
+عند النشر يختار الواجهة غالباً «Anyone with a Google account» — في الـ manifest المكافئ هو **`ANYONE`** (وليس نصاً مثل `ANYONE_WITH_GOOGLE_ACCOUNT`؛ ذلك يُرفض من واجهة Google ومن أداة `clasp push`).
+
+مثال يطابق مستودع `src`:
 ```json
 {
   "timeZone": "Asia/Dubai",
   "dependencies": {},
   "webapp": {
     "executeAs": "USER_DEPLOYING",
-    "access": "ANYONE_WITH_GOOGLE_ACCOUNT"
+    "access": "ANYONE"
   },
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8"
 }
 ```
 
+أضف إلى الملف حقول **`oauthScopes`** وغيرها حسب **`src/appsscript.json`** في المستودع.
+
 **مهم:** `executeAs` يجب أن يكون `USER_DEPLOYING` (أي: Me / المالك).
+
+---
+
+## النشر عبر clasp من المستودع (موصى به للصيانة)
+
+**مشروع Apps Script («Aldhafra IMS») — معرّف السكربت الحالي:**
+`1LEZ1H4GvzW7Hot5cQTbvOYYTQy1UYkPinSQbCqufJ4eBprkzqcFPCeOY`
+
+الخطوات النموذجية (من جهاز المطور):
+
+1. تثبيت الأداة: `npm install -g @google/clasp`
+2. تسجيل الدخول: `clasp login` (بالحساب الذي يملك المشروع)
+3. استنساخ المستودع:  
+   `git clone https://github.com/tarekabuozaid/MEP-Store.git`  
+   ثم الانتقال إلى: `cd MEP-Store/src`
+4. ربط المجلّد المحلي بالمشروع القائم:  
+   `clasp clone <SCRIPT_ID> --rootDir .`  
+   — يُنشئ `.clasp.json`؛ **انتبه:** لو كان المشروع على السحابة فيه ملفات قليلة، قد تُجلَب إلى المحلي؛ احتفظ بنسخة Git سليمة (مثلاً `git checkout -- .` وحذف ملفات زائدة مثل `Code.js` إن ظهرت) قبل الدفع القادم.
+5. رفع المصدر إلى Apps Script: `clasp push --force`
+
+بعد ذلك، لا يزال نشر **Web App** من لوحة Apps Script (**Deploy**) مطلوباً لاختيار نسخة التشغيل وإصدار رابط **`/exec`**.
 
 ---
 
@@ -233,7 +259,8 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
 | المتغير | القيمة | الاستخدام |
 |---------|--------|---------|
 | `SPREADSHEET_ID` | ID الملف من الـ URL | في Code.gs |
-| `PROD_WEB_APP_URL` | رابط `/exec` | للمستخدمين |
+| `SCRIPT_ID` / `.clasp.json` | `1LEZ1H4GvzW7Hot5cQTbvOYYTQy1UYkPinSQbCqufJ4eBprkzqcFPCeOY` (مثال مشروع Aldhafra IMS) | `clasp` |
+| `PROD_WEB_APP_URL` | رابط `/exec` (مثال نشر حقيقي: `https://script.google.com/macros/s/AKfycbznw4l5cq9wHJSTKtc9y8up5f28_avppDO4csc5uF1KXWBOaCefnzcueYqFvuCtCwu4/exec`) | للمستخدمين |
 | `DEV_WEB_APP_URL` | رابط `/dev` | للاختبار |
 | `ADMIN_EMAIL` | بريد الأدمن | للطوارئ |
 
@@ -248,3 +275,4 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
 | الـ Session.getActiveUser() فارغ | الوصول مضبوط على "Anyone (even anonymous)" | غيّر لـ "Anyone with Google account" |
 | LockService timeout | طلبات كثيرة متزامنة | زد timeoutMs أو حسّن الكود |
 | بيانات لا تظهر | نسخة قديمة من الـ deployment | Deploy → Manage → Edit → New version |
+| `Invalid manifest … webapp.access` عند `clasp push` | قيمة `access` غير مسموحة في JSON | استخدم `ANYONE` أو إحدى القيم الرسمية فقط؛ انظر الخطوة 2.3 |

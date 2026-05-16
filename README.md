@@ -19,7 +19,7 @@ A web-based inventory management system that lets store keepers record transacti
 ## Repository structure
 
 ```
-office/
+.
 ├── docs/
 │   ├── 01-VBA-AldhafraIMS-Module-Analysis.md    ← Legacy Excel/VBA analysis
 │   ├── 02-Workbook-XLSM-Technical-Analysis.md

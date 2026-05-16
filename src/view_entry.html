@@ -1,7 +1,9 @@
 <script>
   // ─── Entry Form View ────────────────────────────────────────────
   async function renderEntryView(container) {
-    const [items, locations] = await Promise.all([getItems(), getLocations()]);
+    // Only load locations upfront (6 rows). Items (7163) are loaded lazily
+    // on first autocomplete keystroke — avoids freezing the renderer.
+    const locations = await getLocations();
     const isAdmin = App.user.role === 'Admin';
     const defaultLocation = isAdmin ? '' : App.user.storeCode;
     const userLocations = isAdmin ? locations : locations.filter(l => l.storeCode === App.user.storeCode);
@@ -58,7 +60,10 @@
       <div class="card">
         <div class="card-header">
           <h2>Items</h2>
-          <button class="btn btn-secondary btn-sm" onclick="addItemRow()">+ Add Row</button>
+          <div class="flex-gap">
+            <button class="btn btn-secondary btn-sm" onclick="showPasteModal()" title="Paste multiple rows from Excel">📋 Paste from Excel</button>
+            <button class="btn btn-secondary btn-sm" onclick="addItemRow()">+ Add Row</button>
+          </div>
         </div>
 
         <div class="table-wrap items-table">
@@ -66,10 +71,10 @@
             <thead>
               <tr>
                 <th style="width:40px;">#</th>
-                <th style="width:200px;">Item Code</th>
+                <th style="width:220px;">Item Code</th>
                 <th>Name</th>
                 <th style="width:80px;">Unit</th>
-                <th style="width:120px;">Quantity</th>
+                <th style="width:130px;">Quantity</th>
                 <th style="width:40px;"></th>
               </tr>
             </thead>
@@ -90,6 +95,250 @@
     addItemRow();
     onTxnTypeChange();
   }
+
+  // ─── Excel Paste Feature ────────────────────────────────────────
+
+  /**
+   * Show the paste-from-Excel modal.
+   * Expected clipboard format: ItemCode [TAB] Qty  (one row per line)
+   */
+  function showPasteModal() {
+    showModal(`
+      <h3>📋 Paste from Excel</h3>
+      <p class="text-muted" style="font-size:0.88rem;margin-bottom:0.75rem;">
+        Copy 2 columns from Excel — <strong>Item Code</strong> and <strong>Quantity</strong> — then paste below.<br>
+        Tab-separated, one item per line. Extra columns are ignored.
+      </p>
+
+      <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:0.6rem 0.75rem;
+                  font-family:monospace;font-size:0.78rem;color:#6b7280;margin-bottom:0.75rem;">
+        Example:&nbsp;&nbsp;&nbsp;2500062884&nbsp;&nbsp;&nbsp;[TAB]&nbsp;&nbsp;&nbsp;10<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2500062885&nbsp;&nbsp;&nbsp;[TAB]&nbsp;&nbsp;&nbsp;5<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ABC-001&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[TAB]&nbsp;&nbsp;&nbsp;3
+      </div>
+
+      <textarea id="pasteTextarea"
+        rows="10"
+        style="font-family:monospace;font-size:0.85rem;resize:vertical;"
+        placeholder="Paste your Excel rows here (Ctrl+V)..."
+        oninput="onPasteTextareaInput(this)"></textarea>
+
+      <div id="pasteRowCount" style="font-size:0.82rem;color:#6b7280;margin-top:0.4rem;"></div>
+      <div id="pasteValidation" style="margin-top:0.75rem;"></div>
+
+      <div class="modal-actions" style="margin-top:1rem;">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="pasteValidateBtn" onclick="validatePaste()">🔍 Validate</button>
+        <button class="btn btn-success hidden" id="pasteInsertBtn" onclick="insertPastedRows()">✅ Insert Rows</button>
+      </div>
+    `);
+
+    // Auto-focus textarea so user can paste immediately
+    setTimeout(() => {
+      const ta = document.getElementById('pasteTextarea');
+      if (ta) ta.focus();
+    }, 100);
+  }
+
+  /** Update row count hint as user types/pastes */
+  function onPasteTextareaInput(ta) {
+    const lines = ta.value.trim().split('\n').filter(l => l.trim());
+    const countEl = document.getElementById('pasteRowCount');
+    if (countEl) {
+      countEl.textContent = lines.length > 0 ? lines.length + ' line(s) detected' : '';
+    }
+    // Reset validation if text changes
+    const valEl = document.getElementById('pasteValidation');
+    if (valEl) valEl.innerHTML = '';
+    const insertBtn = document.getElementById('pasteInsertBtn');
+    if (insertBtn) insertBtn.classList.add('hidden');
+  }
+
+  /**
+   * Parse pasted text into [{code, qty, raw}] array.
+   * Handles: TAB, multiple spaces, comma, semicolon separators.
+   */
+  function parsePasteText(text) {
+    const lines = text.split('\n');
+    const parsed = [];
+    lines.forEach((line, idx) => {
+      const raw = line.trim();
+      if (!raw) return;
+
+      // Try TAB first, then 2+ spaces, then comma/semicolon
+      let parts;
+      if (raw.includes('\t')) {
+        parts = raw.split('\t').map(p => p.trim()).filter(p => p);
+      } else if (/  +/.test(raw)) {
+        parts = raw.split(/  +/).map(p => p.trim()).filter(p => p);
+      } else if (raw.includes(',')) {
+        parts = raw.split(',').map(p => p.trim()).filter(p => p);
+      } else if (raw.includes(';')) {
+        parts = raw.split(';').map(p => p.trim()).filter(p => p);
+      } else {
+        // Single token — code only, no qty
+        parts = [raw];
+      }
+
+      const code = parts[0] || '';
+      const qtyRaw = parts[1] || '';
+      const qty = qtyRaw !== '' ? parseFloat(qtyRaw.replace(/,/g, '')) : null;
+
+      parsed.push({ code: code, qty: qty, qtyRaw: qtyRaw, raw: raw, lineNo: idx + 1 });
+    });
+    return parsed;
+  }
+
+  /** Validate pasted rows against Master_Items cache, show results in modal */
+  async function validatePaste() {
+    const ta = document.getElementById('pasteTextarea');
+    const valEl = document.getElementById('pasteValidation');
+    const insertBtn = document.getElementById('pasteInsertBtn');
+    const validateBtn = document.getElementById('pasteValidateBtn');
+
+    if (!ta || !ta.value.trim()) {
+      valEl.innerHTML = '<div class="alert alert-warning">Please paste some rows first.</div>';
+      return;
+    }
+
+    validateBtn.disabled = true;
+    validateBtn.textContent = '⏳ Validating...';
+
+    const items = await getItems();
+    // Build O(1) lookup map: UPPER_CODE → item
+    const itemMap = {};
+    items.forEach(i => { itemMap[i.itemCode.toUpperCase()] = i; });
+
+    const parsed = parsePasteText(ta.value);
+    const valid = [];
+    const invalid = [];
+
+    parsed.forEach(row => {
+      if (!row.code) return;
+      const item = itemMap[row.code.toUpperCase()];
+      const qtyNum = row.qty;
+      const qtyOk = qtyNum !== null && !isNaN(qtyNum) && qtyNum !== 0;
+
+      if (!item) {
+        invalid.push({ ...row, reason: 'Item code not found in master list' });
+      } else if (!qtyOk) {
+        if (row.qtyRaw === '') {
+          // No qty provided — flag but allow user to fix manually
+          invalid.push({ ...row, item: item, reason: 'Quantity missing' });
+        } else {
+          invalid.push({ ...row, item: item, reason: 'Invalid quantity: "' + row.qtyRaw + '"' });
+        }
+      } else {
+        valid.push({ ...row, item: item, qty: qtyNum });
+      }
+    });
+
+    // Store for insertion
+    window.__pasteValidRows = valid;
+
+    // Build validation summary HTML
+    let html = '';
+    if (valid.length > 0) {
+      html += '<div class="alert alert-success"><strong>✅ ' + valid.length + ' row(s) ready to insert:</strong><ul style="margin:0.4rem 0 0;font-size:0.82rem;">' +
+        valid.slice(0, 10).map(r =>
+          '<li><code>' + escapeHtml(r.code) + '</code> — ' + escapeHtml(r.item.itemName) +
+          ' — Qty: <strong>' + r.qty + '</strong> ' + escapeHtml(r.item.unit) + '</li>'
+        ).join('') +
+        (valid.length > 10 ? '<li class="text-muted">... and ' + (valid.length - 10) + ' more</li>' : '') +
+        '</ul></div>';
+    }
+    if (invalid.length > 0) {
+      html += '<div class="alert alert-error"><strong>❌ ' + invalid.length + ' row(s) skipped:</strong><ul style="margin:0.4rem 0 0;font-size:0.82rem;">' +
+        invalid.slice(0, 8).map(r =>
+          '<li>Line ' + r.lineNo + ': <code>' + escapeHtml(r.code) + '</code> — ' + escapeHtml(r.reason) + '</li>'
+        ).join('') +
+        (invalid.length > 8 ? '<li class="text-muted">... and ' + (invalid.length - 8) + ' more</li>' : '') +
+        '</ul></div>';
+    }
+    if (valid.length === 0 && invalid.length === 0) {
+      html = '<div class="alert alert-warning">No data found. Please check the format and try again.</div>';
+    }
+
+    valEl.innerHTML = html;
+    validateBtn.disabled = false;
+    validateBtn.textContent = '🔍 Validate';
+
+    if (valid.length > 0) {
+      insertBtn.classList.remove('hidden');
+    } else {
+      insertBtn.classList.add('hidden');
+    }
+  }
+
+  /** Insert validated rows into the items table */
+  async function insertPastedRows() {
+    const rows = window.__pasteValidRows || [];
+    if (!rows.length) return;
+
+    // Clear existing EMPTY rows first (code='' and qty='')
+    document.querySelectorAll('#itemsTbody tr').forEach(tr => {
+      const code = (tr.querySelector('.item-code').value || '').trim();
+      const qty  = (tr.querySelector('.item-qty').value || '').trim();
+      if (!code && !qty) tr.remove();
+    });
+
+    const txnType = document.getElementById('txnType').value;
+    const location = document.getElementById('sourceLocation').value;
+    const needBalance = (txnType === 'Issuance' || txnType === 'Transfer') && location;
+
+    // Insert each valid row
+    for (const row of rows) {
+      const tbody = document.getElementById('itemsTbody');
+      const idx = ++window.__entryRowIndex;
+      const tr = document.createElement('tr');
+      tr.dataset.rowIdx = idx;
+      tr.dataset.itemCode = row.item.itemCode;
+      tr.dataset.itemName = row.item.itemName;
+      tr.dataset.itemUnit = row.item.unit;
+      tr.dataset.minStock = row.item.minStock;
+
+      tr.innerHTML = `
+        <td>${idx}</td>
+        <td>
+          <div class="autocomplete-wrap">
+            <input type="text" class="item-code" value="${escapeHtml(row.item.itemCode)}" oninput="onItemCodeInput(this)" autocomplete="off">
+          </div>
+        </td>
+        <td><span class="item-name">${escapeHtml(row.item.itemName)}</span></td>
+        <td><span class="item-unit">${escapeHtml(row.item.unit)}</span></td>
+        <td>
+          <input type="number" class="item-qty" value="${row.qty}" step="any" oninput="onQtyInput(this)">
+          <div class="balance-hint"></div>
+        </td>
+        <td><button class="btn btn-secondary btn-sm" onclick="removeItemRow(this)" title="Remove row">✕</button></td>
+      `;
+      tbody.appendChild(tr);
+
+      // Load balance for Issuance/Transfer
+      if (needBalance) {
+        try {
+          const balance = await callApi('api_getBalance', row.item.itemCode, location);
+          tr.dataset.balance = balance;
+          updateBalanceHint(tr);
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    // Ensure at least one empty row remains for manual additions
+    const tbody = document.getElementById('itemsTbody');
+    const allFilled = Array.from(tbody.querySelectorAll('tr')).every(tr =>
+      (tr.querySelector('.item-code').value || '').trim() !== ''
+    );
+    if (allFilled) addItemRow();
+
+    closeModal();
+    showToast('✅ ' + rows.length + ' row(s) inserted', 'success');
+
+    // Scroll to table
+    tbody.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ─── Existing row management ───────────────────────────────────
 
   function onTxnTypeChange() {
     const type = document.getElementById('txnType').value;

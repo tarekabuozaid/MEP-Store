@@ -164,26 +164,44 @@ const TransactionService = (function() {
   function validateLines(lines, txnType) {
     const errors = [];
     const validLines = [];
-    const masterItems = DataService.getMasterItems(true);
-    const masterMap = {};
-    masterItems.forEach(i => { masterMap[i.itemCode.toUpperCase()] = i; });
 
-    lines.forEach((line, idx) => {
-      const rowNum = idx + 1;
-      const code = String(line.itemCode || '').trim();
+    // Only load master items for types that REQUIRE the item to pre-exist
+    // Receipt & Adjustment: new/unknown items are accepted
+    // Issuance & Transfer: item must exist (we need name/unit and balance check)
+    var requireMaster = (txnType === CONFIG.TXN_TYPES.ISSUANCE ||
+                         txnType === CONFIG.TXN_TYPES.TRANSFER);
+
+    const masterItems = DataService.getMasterItems(false); // include inactive too
+    const masterMap = {};
+    masterItems.forEach(function(i) { masterMap[i.itemCode.toUpperCase()] = i; });
+
+    lines.forEach(function(line, idx) {
+      var rowNum = idx + 1;
+      var code = String(line.itemCode || '').trim();
 
       // Silent skip: empty or "0"
       if (!code || code === '0') return;
 
-      // Item must exist and be active
-      const item = masterMap[code.toUpperCase()];
+      var item = masterMap[code.toUpperCase()];
+
       if (!item) {
-        errors.push({ row: rowNum, message: 'Item code "' + code + '" not found in master items' });
-        return;
+        if (requireMaster) {
+          // Issuance / Transfer — item must be in master (need balance + details)
+          errors.push({ row: rowNum, message: 'Item code "' + code + '" not found. Cannot issue/transfer an item with no inventory record.' });
+          return;
+        }
+        // Receipt / Adjustment — accept unknown item as new stock entry
+        // Use provided name/unit from client, or fall back to code itself
+        item = {
+          itemCode: code,
+          itemName: String(line.itemName || code).trim(),
+          unit:     String(line.unit || '').trim(),
+          minStock: 0
+        };
       }
 
-      // Quantity
-      const qty = Number(line.qty);
+      // Quantity validation
+      var qty = Number(line.qty);
       if (isNaN(qty)) {
         errors.push({ row: rowNum, message: 'Quantity in row ' + rowNum + ' must be a number' });
         return;
@@ -203,8 +221,8 @@ const TransactionService = (function() {
       validLines.push({
         itemCode: item.itemCode,
         itemName: item.itemName,
-        unit: item.unit,
-        qty: qty,
+        unit:     item.unit,
+        qty:      qty,
         minStock: item.minStock
       });
     });

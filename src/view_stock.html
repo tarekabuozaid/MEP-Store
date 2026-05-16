@@ -8,9 +8,12 @@
       getLocations()
     ]);
 
-    const isAdmin = App.user.role === 'Admin';
+    const isAdmin  = App.user.role === 'Admin';
 
-    // Build location options for Admin
+    // Collect unique categories and units from data
+    const categories = [...new Set(stock.map(s => s.category).filter(Boolean))].sort();
+    const units      = [...new Set(stock.map(s => s.unit).filter(Boolean))].sort();
+
     const locOptions = isAdmin
       ? ['<option value="">All Stores</option>',
          ...locations.map(l =>
@@ -22,32 +25,93 @@
       <div class="card">
         <div class="card-header">
           <h2>📦 Stock</h2>
+          <button class="btn btn-sm btn-secondary" onclick="resetStockFilters()">↺ Reset</button>
         </div>
 
         <!-- KPI bar -->
         <div class="kpi-grid" id="stockKpis"></div>
 
-        <!-- Filter bar -->
-        <div class="flex-gap mb-2" style="align-items:center;flex-wrap:wrap;">
-          <div class="btn-group" id="stockFilterBtns">
-            <button class="btn btn-sm btn-secondary" data-filter="instock" onclick="setStockFilter('instock')">In Stock</button>
-            <button class="btn btn-sm btn-secondary" data-filter="alerts"  onclick="setStockFilter('alerts')">⚠ Alerts</button>
-            <button class="btn btn-sm btn-secondary" data-filter="all"     onclick="setStockFilter('all')">All</button>
+        <!-- Filter panel -->
+        <div class="filter-panel" id="stockFilterPanel">
+
+          <!-- Row 1: Quick filter + Location + Category + Unit -->
+          <div class="filter-row">
+            <div class="filter-field">
+              <label>Status</label>
+              <div class="btn-group" id="stockFilterBtns">
+                <button class="btn btn-sm btn-secondary" data-filter="instock" onclick="setStockFilter('instock')">In Stock</button>
+                <button class="btn btn-sm btn-secondary" data-filter="alerts"  onclick="setStockFilter('alerts')">⚠ Alerts</button>
+                <button class="btn btn-sm btn-secondary" data-filter="all"     onclick="setStockFilter('all')">All</button>
+              </div>
+            </div>
+
+            ${isAdmin ? `
+            <div class="filter-field">
+              <label>Store</label>
+              <select id="stockLocFilter" onchange="applyStockFilters()">
+                ${locOptions}
+              </select>
+            </div>` : ''}
+
+            <div class="filter-field">
+              <label>Category</label>
+              <select id="stockCatFilter" onchange="applyStockFilters()">
+                <option value="">All Categories</option>
+                ${categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="filter-field">
+              <label>Unit</label>
+              <select id="stockUnitFilter" onchange="applyStockFilters()">
+                <option value="">All Units</option>
+                ${units.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('')}
+              </select>
+            </div>
           </div>
-          ${isAdmin ? `
-          <select id="stockLocFilter" onchange="applyStockFilters()" style="min-width:180px;">
-            ${locOptions}
-          </select>` : ''}
-          <input type="text" id="stockSearch" placeholder="🔍 Search code or name…"
-                 style="flex:1;min-width:160px;" oninput="applyStockFilters()">
+
+          <!-- Row 2: Search + Balance range + Min stock -->
+          <div class="filter-row">
+            <div class="filter-field" style="flex:2;">
+              <label>Search</label>
+              <input type="text" id="stockSearch" placeholder="Code or name…" oninput="applyStockFilters()">
+            </div>
+
+            <div class="filter-field">
+              <label>Balance ≥</label>
+              <input type="number" id="stockBalMin" min="0" placeholder="0" style="width:90px;"
+                     oninput="applyStockFilters()">
+            </div>
+
+            <div class="filter-field">
+              <label>Balance ≤</label>
+              <input type="number" id="stockBalMax" min="0" placeholder="∞" style="width:90px;"
+                     oninput="applyStockFilters()">
+            </div>
+
+            <div class="filter-field">
+              <label>Min Stock</label>
+              <select id="stockMinStockFilter" onchange="applyStockFilters()">
+                <option value="">Any</option>
+                <option value="set">Has Min Set</option>
+                <option value="none">No Min Defined</option>
+              </select>
+            </div>
+          </div>
+
         </div>
 
+        <!-- Results count -->
+        <div id="stockCount" class="text-muted" style="font-size:0.82rem;padding:0.35rem 0;"></div>
+
+        <!-- Table -->
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th onclick="sortStock('itemCode')" style="cursor:pointer;">Code ↕</th>
                 <th>Name</th>
+                <th onclick="sortStock('category')" style="cursor:pointer;">Category ↕</th>
                 ${isAdmin ? '<th onclick="sortStock(\'location\')" style="cursor:pointer;">Location ↕</th>' : ''}
                 <th class="text-end" onclick="sortStock('balance')" style="cursor:pointer;">Balance ↕</th>
                 <th>Unit</th>
@@ -58,18 +122,17 @@
             <tbody id="stockTbody"></tbody>
           </table>
         </div>
-        <div id="stockCount" class="text-muted" style="font-size:0.82rem;padding:0.4rem 0;"></div>
       </div>
     `;
 
-    window.__stockData    = stock;
-    window.__stockSort    = { col: 'balance', dir: -1 };   // default: highest balance first
-    window.__stockFilter  = 'instock';                      // default: In Stock
+    window.__stockData   = stock;
+    window.__stockSort   = { col: 'balance', dir: -1 };
+    window.__stockFilter = 'instock';
 
-    setStockFilter('instock', /*noRefresh*/ false);
+    setStockFilter('instock', false);
   }
 
-  // ── Quick-filter button selection ────────────────────────────────
+  // ── Quick-filter button ──────────────────────────────────────────
   function setStockFilter(filter, noRefresh) {
     window.__stockFilter = filter;
     document.querySelectorAll('#stockFilterBtns .btn').forEach(function(btn) {
@@ -78,6 +141,16 @@
       btn.classList.toggle('btn-secondary', !active);
     });
     if (!noRefresh) applyStockFilters();
+  }
+
+  // ── Reset all filters ────────────────────────────────────────────
+  function resetStockFilters() {
+    ['stockSearch', 'stockCatFilter', 'stockUnitFilter', 'stockLocFilter',
+     'stockBalMin', 'stockBalMax', 'stockMinStockFilter'].forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    setStockFilter('instock');
   }
 
   // ── Sort ─────────────────────────────────────────────────────────
@@ -90,24 +163,41 @@
 
   // ── Combined filter + sort + render ─────────────────────────────
   function applyStockFilters() {
-    const search    = (document.getElementById('stockSearch')     ? document.getElementById('stockSearch').value     : '').toLowerCase();
-    const locFilter = document.getElementById('stockLocFilter')   ? document.getElementById('stockLocFilter').value  : '';
-    const filter    = window.__stockFilter || 'instock';
-    const { col, dir } = window.__stockSort;
+    const search       = (document.getElementById('stockSearch')         ? document.getElementById('stockSearch').value         : '').toLowerCase();
+    const locFilter    =  document.getElementById('stockLocFilter')       ? document.getElementById('stockLocFilter').value       : '';
+    const catFilter    =  document.getElementById('stockCatFilter')       ? document.getElementById('stockCatFilter').value       : '';
+    const unitFilter   =  document.getElementById('stockUnitFilter')      ? document.getElementById('stockUnitFilter').value      : '';
+    const balMinRaw    =  document.getElementById('stockBalMin')          ? document.getElementById('stockBalMin').value          : '';
+    const balMaxRaw    =  document.getElementById('stockBalMax')          ? document.getElementById('stockBalMax').value          : '';
+    const minStockMode =  document.getElementById('stockMinStockFilter')  ? document.getElementById('stockMinStockFilter').value  : '';
+    const filter       =  window.__stockFilter || 'instock';
+    const { col, dir } =  window.__stockSort;
+
+    const balMin = balMinRaw !== '' ? Number(balMinRaw) : null;
+    const balMax = balMaxRaw !== '' ? Number(balMaxRaw) : null;
 
     let rows = window.__stockData.slice();
 
-    // Location filter (Admin only)
-    if (locFilter) {
-      rows = rows.filter(s => s.location === locFilter);
-    }
+    // Status quick-filter
+    if (filter === 'instock') rows = rows.filter(s => s.balance > 0);
+    else if (filter === 'alerts') rows = rows.filter(s => s.status !== 'OK');
 
-    // Quick filter
-    if (filter === 'instock') {
-      rows = rows.filter(s => s.balance > 0);
-    } else if (filter === 'alerts') {
-      rows = rows.filter(s => s.status !== 'OK');
-    }
+    // Location
+    if (locFilter) rows = rows.filter(s => s.location === locFilter);
+
+    // Category
+    if (catFilter) rows = rows.filter(s => (s.category || '') === catFilter);
+
+    // Unit
+    if (unitFilter) rows = rows.filter(s => s.unit === unitFilter);
+
+    // Balance range
+    if (balMin !== null) rows = rows.filter(s => s.balance >= balMin);
+    if (balMax !== null) rows = rows.filter(s => s.balance <= balMax);
+
+    // Min stock status
+    if (minStockMode === 'set')  rows = rows.filter(s => s.minStock > 0);
+    if (minStockMode === 'none') rows = rows.filter(s => !s.minStock || s.minStock === 0);
 
     // Text search
     if (search) {
@@ -119,8 +209,8 @@
 
     // Sort
     rows.sort(function(a, b) {
-      const va = typeof a[col] === 'string' ? a[col].toLowerCase() : (a[col] || 0);
-      const vb = typeof b[col] === 'string' ? b[col].toLowerCase() : (b[col] || 0);
+      const va = typeof a[col] === 'string' ? (a[col] || '').toLowerCase() : (a[col] || 0);
+      const vb = typeof b[col] === 'string' ? (b[col] || '').toLowerCase() : (b[col] || 0);
       return va < vb ? -dir : va > vb ? dir : 0;
     });
 
@@ -128,44 +218,39 @@
     renderStockRows(rows);
   }
 
-  // ── KPI bar ──────────────────────────────────────────────────────
+  // ── KPI bar (clickable) ──────────────────────────────────────────
   function updateStockKpis(visibleRows) {
-    const all      = window.__stockData;
-    const inStock  = all.filter(s => s.balance > 0).length;
-    const low      = all.filter(s => s.status === 'LOW').length;
-    const zero     = all.filter(s => s.status === 'ZERO').length;
-
-    const el = document.getElementById('stockKpis');
+    const all     = window.__stockData;
+    const inStock = all.filter(s => s.balance > 0).length;
+    const low     = all.filter(s => s.status === 'LOW').length;
+    const zero    = all.filter(s => s.status === 'ZERO').length;
+    const el      = document.getElementById('stockKpis');
     if (!el) return;
     el.innerHTML = `
       <div class="kpi kpi-success" style="cursor:pointer;" onclick="setStockFilter('instock')">
-        <div class="kpi-label">In Stock</div>
-        <div class="kpi-value">${inStock}</div>
+        <div class="kpi-label">In Stock</div><div class="kpi-value">${inStock}</div>
       </div>
       <div class="kpi kpi-warning" style="cursor:pointer;" onclick="setStockFilter('alerts')">
-        <div class="kpi-label">Below Min</div>
-        <div class="kpi-value">${low}</div>
+        <div class="kpi-label">Below Min</div><div class="kpi-value">${low}</div>
       </div>
       <div class="kpi kpi-danger" style="cursor:pointer;" onclick="setStockFilter('alerts')">
-        <div class="kpi-label">Zero Stock</div>
-        <div class="kpi-value">${zero}</div>
+        <div class="kpi-label">Zero Stock</div><div class="kpi-value">${zero}</div>
       </div>
       <div class="kpi" style="cursor:pointer;" onclick="setStockFilter('all')">
-        <div class="kpi-label">Total Items</div>
-        <div class="kpi-value">${all.length}</div>
+        <div class="kpi-label">Total Items</div><div class="kpi-value">${all.length}</div>
       </div>
     `;
   }
 
   // ── Table rows ───────────────────────────────────────────────────
   function renderStockRows(rows) {
-    const tbody    = document.getElementById('stockTbody');
-    const countEl  = document.getElementById('stockCount');
-    const isAdmin  = App.user.role === 'Admin';
-    const cols     = isAdmin ? 7 : 6;
+    const tbody   = document.getElementById('stockTbody');
+    const countEl = document.getElementById('stockCount');
+    const isAdmin = App.user.role === 'Admin';
+    const cols    = isAdmin ? 8 : 7;
 
     if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center text-muted" style="padding:2rem;">No items match the current filter</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center text-muted" style="padding:2rem;">No items match the current filters</td></tr>`;
       if (countEl) countEl.textContent = '';
       return;
     }
@@ -176,6 +261,7 @@
       <tr>
         <td><code>${escapeHtml(s.itemCode)}</code></td>
         <td>${escapeHtml(s.itemName)}</td>
+        <td class="text-muted" style="font-size:0.83rem;">${escapeHtml(s.category || '—')}</td>
         ${isAdmin ? `<td>${escapeHtml(s.location)}</td>` : ''}
         <td class="text-end"><strong>${s.balance}</strong></td>
         <td>${escapeHtml(s.unit)}</td>

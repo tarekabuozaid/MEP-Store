@@ -194,6 +194,43 @@
   .btn-group .btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
   .btn-group .btn:last-child  { border-radius: 0 var(--radius) var(--radius) 0; border-right-width: 1px; }
 
+  /* ─── Filter panel ──────────────────────────────────── */
+  .filter-panel {
+    background: #f8fafc;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: flex-end;
+  }
+  .filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 120px;
+    flex: 1;
+  }
+  .filter-field label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .filter-field select,
+  .filter-field input[type="text"],
+  .filter-field input[type="number"] {
+    width: 100%;
+  }
+
   /* ─── Tables ─────────────────────────────────────────── */
   .table-wrap {
     overflow-x: auto;

@@ -8,13 +8,18 @@
       getLocations()
     ]);
 
-    const itemMap = {};
+    // Build item map + collect metadata
+    const itemMap    = {};
+    const catSet     = new Set();
+    const unitSet    = new Set();
+
     stockRows.forEach(r => {
       if (!itemMap[r.itemCode]) {
         itemMap[r.itemCode] = {
           itemCode: r.itemCode,
           itemName: r.itemName,
           unit:     r.unit,
+          category: r.category || '',
           minStock: r.minStock,
           balances: {},
           total:    0,
@@ -24,35 +29,93 @@
       itemMap[r.itemCode].balances[r.location] = { balance: r.balance, status: r.status };
       itemMap[r.itemCode].total += r.balance;
       if (r.balance > 0) itemMap[r.itemCode].hasAny = true;
+      if (r.category) catSet.add(r.category);
+      if (r.unit)     unitSet.add(r.unit);
     });
 
-    const items = Object.values(itemMap);
-    const inStockTotal = items.filter(i => i.total > 0).length;
+    const categories = [...catSet].sort();
+    const units      = [...unitSet].sort();
+    const inStockTotal = Object.values(itemMap).filter(i => i.total > 0).length;
 
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
           <h2>📦 Stock Balances — All Stores</h2>
-          <span class="text-muted" style="font-size:0.85rem;">${inStockTotal} items with stock across all stores</span>
+          <button class="btn btn-sm btn-secondary" onclick="resetAllStockFilters()">↺ Reset</button>
         </div>
 
-        <div class="flex-gap mb-2" style="align-items:center;flex-wrap:wrap;">
-          <div class="btn-group" id="allStockFilterBtns">
-            <button class="btn btn-sm btn-secondary" data-filter="instock" onclick="setAllStockFilter('instock')">In Stock</button>
-            <button class="btn btn-sm btn-secondary" data-filter="alerts"  onclick="setAllStockFilter('alerts')">⚠ Alerts</button>
-            <button class="btn btn-sm btn-secondary" data-filter="all"     onclick="setAllStockFilter('all')">All</button>
+        <div class="filter-panel">
+
+          <!-- Row 1 -->
+          <div class="filter-row">
+            <div class="filter-field">
+              <label>Status</label>
+              <div class="btn-group" id="allStockFilterBtns">
+                <button class="btn btn-sm btn-secondary" data-filter="instock" onclick="setAllStockFilter('instock')">In Stock</button>
+                <button class="btn btn-sm btn-secondary" data-filter="alerts"  onclick="setAllStockFilter('alerts')">⚠ Alerts</button>
+                <button class="btn btn-sm btn-secondary" data-filter="all"     onclick="setAllStockFilter('all')">All</button>
+              </div>
+            </div>
+
+            <div class="filter-field">
+              <label>Category</label>
+              <select id="allCatFilter" onchange="applyAllStockFilters()">
+                <option value="">All Categories</option>
+                ${categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="filter-field">
+              <label>Unit</label>
+              <select id="allUnitFilter" onchange="applyAllStockFilters()">
+                <option value="">All Units</option>
+                ${units.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="filter-field">
+              <label>Min Stock</label>
+              <select id="allMinStockFilter" onchange="applyAllStockFilters()">
+                <option value="">Any</option>
+                <option value="set">Has Min Set</option>
+                <option value="none">No Min Defined</option>
+              </select>
+            </div>
           </div>
-          <input type="text" id="allStockSearch" placeholder="🔍 Search code or name…"
-                 style="flex:1;min-width:160px;" oninput="applyAllStockFilters()">
+
+          <!-- Row 2 -->
+          <div class="filter-row">
+            <div class="filter-field" style="flex:2;">
+              <label>Search</label>
+              <input type="text" id="allStockSearch" placeholder="Code or name…" oninput="applyAllStockFilters()">
+            </div>
+
+            <div class="filter-field">
+              <label>Total ≥</label>
+              <input type="number" id="allBalMin" min="0" placeholder="0" style="width:90px;"
+                     oninput="applyAllStockFilters()">
+            </div>
+
+            <div class="filter-field">
+              <label>Total ≤</label>
+              <input type="number" id="allBalMax" min="0" placeholder="∞" style="width:90px;"
+                     oninput="applyAllStockFilters()">
+            </div>
+          </div>
+
         </div>
-        <div id="allStockCount" class="text-muted" style="font-size:0.82rem;padding:0.25rem 0;margin-bottom:0.5rem;"></div>
+
+        <div id="allStockCount" class="text-muted" style="font-size:0.82rem;padding:0.35rem 0;margin-bottom:0.25rem;">
+          ${inStockTotal} items with stock across all stores
+        </div>
 
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th onclick="sortAllStock('itemCode')" style="cursor:pointer;">Code ↕</th>
+                <th onclick="sortAllStock('itemCode')"  style="cursor:pointer;">Code ↕</th>
                 <th>Item</th>
+                <th onclick="sortAllStock('category')"  style="cursor:pointer;">Category ↕</th>
                 <th>Unit</th>
                 ${locations.map(l => `<th class="text-end">${escapeHtml(l.storeName)}<br><small class="text-muted">${escapeHtml(l.storeCode)}</small></th>`).join('')}
                 <th class="text-end" onclick="sortAllStock('total')" style="cursor:pointer;background:#1d4ed8;color:#fff;">Total ↕</th>
@@ -65,15 +128,15 @@
       </div>
     `;
 
-    window.__allStockData      = items;
+    window.__allStockData      = Object.values(itemMap);
     window.__allStockLocations = locations;
-    window.__allStockSort      = { col: 'total', dir: -1 };  // highest total first
-    window.__allStockFilter    = 'instock';                   // default: In Stock
+    window.__allStockSort      = { col: 'total', dir: -1 };
+    window.__allStockFilter    = 'instock';
 
     setAllStockFilter('instock', false);
   }
 
-  // ── Quick-filter button ──────────────────────────────────────────
+  // ── Quick-filter ─────────────────────────────────────────────────
   function setAllStockFilter(filter, noRefresh) {
     window.__allStockFilter = filter;
     document.querySelectorAll('#allStockFilterBtns .btn').forEach(function(btn) {
@@ -84,7 +147,17 @@
     if (!noRefresh) applyAllStockFilters();
   }
 
-  // ── Sort column ──────────────────────────────────────────────────
+  // ── Reset ─────────────────────────────────────────────────────────
+  function resetAllStockFilters() {
+    ['allStockSearch', 'allCatFilter', 'allUnitFilter', 'allMinStockFilter',
+     'allBalMin', 'allBalMax'].forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    setAllStockFilter('instock');
+  }
+
+  // ── Sort ──────────────────────────────────────────────────────────
   function sortAllStock(col) {
     const s = window.__allStockSort;
     s.dir = (s.col === col) ? s.dir * -1 : -1;
@@ -92,53 +165,74 @@
     applyAllStockFilters();
   }
 
-  // ── Combined filter + sort + render ─────────────────────────────
+  // ── Combined filter + sort + render ──────────────────────────────
   function applyAllStockFilters() {
-    const search = (document.getElementById('allStockSearch').value || '').toLowerCase();
-    const filter = window.__allStockFilter || 'instock';
-    const { col, dir } = window.__allStockSort;
+    const search       = (document.getElementById('allStockSearch')    ? document.getElementById('allStockSearch').value    : '').toLowerCase();
+    const catFilter    =  document.getElementById('allCatFilter')       ? document.getElementById('allCatFilter').value       : '';
+    const unitFilter   =  document.getElementById('allUnitFilter')      ? document.getElementById('allUnitFilter').value      : '';
+    const minStockMode =  document.getElementById('allMinStockFilter')  ? document.getElementById('allMinStockFilter').value  : '';
+    const balMinRaw    =  document.getElementById('allBalMin')          ? document.getElementById('allBalMin').value          : '';
+    const balMaxRaw    =  document.getElementById('allBalMax')          ? document.getElementById('allBalMax').value          : '';
+    const filter       =  window.__allStockFilter || 'instock';
+    const { col, dir } =  window.__allStockSort;
 
-    let filtered = window.__allStockData.slice();
+    const balMin = balMinRaw !== '' ? Number(balMinRaw) : null;
+    const balMax = balMaxRaw !== '' ? Number(balMaxRaw) : null;
 
-    // Quick filter
-    if (filter === 'instock') {
-      filtered = filtered.filter(i => i.total > 0);
-    } else if (filter === 'alerts') {
-      filtered = filtered.filter(i => {
+    let items = window.__allStockData.slice();
+
+    // Status
+    if (filter === 'instock') items = items.filter(i => i.total > 0);
+    else if (filter === 'alerts') {
+      items = items.filter(i => {
         if (i.minStock > 0 && i.total < i.minStock) return true;
         return Object.values(i.balances).some(b => b.status !== 'OK');
       });
     }
 
-    // Text search
+    // Category
+    if (catFilter) items = items.filter(i => (i.category || '') === catFilter);
+
+    // Unit
+    if (unitFilter) items = items.filter(i => i.unit === unitFilter);
+
+    // Min stock
+    if (minStockMode === 'set')  items = items.filter(i => i.minStock > 0);
+    if (minStockMode === 'none') items = items.filter(i => !i.minStock || i.minStock === 0);
+
+    // Total range
+    if (balMin !== null) items = items.filter(i => i.total >= balMin);
+    if (balMax !== null) items = items.filter(i => i.total <= balMax);
+
+    // Search
     if (search) {
-      filtered = filtered.filter(i =>
+      items = items.filter(i =>
         i.itemCode.toLowerCase().includes(search) ||
         i.itemName.toLowerCase().includes(search)
       );
     }
 
     // Sort
-    filtered.sort(function(a, b) {
-      const va = typeof a[col] === 'string' ? a[col].toLowerCase() : (a[col] || 0);
-      const vb = typeof b[col] === 'string' ? b[col].toLowerCase() : (b[col] || 0);
+    items.sort(function(a, b) {
+      const va = typeof a[col] === 'string' ? (a[col] || '').toLowerCase() : (a[col] || 0);
+      const vb = typeof b[col] === 'string' ? (b[col] || '').toLowerCase() : (b[col] || 0);
       return va < vb ? -dir : va > vb ? dir : 0;
     });
 
-    renderAllStockRows(filtered);
-  }
-
-  // ── Table rows ───────────────────────────────────────────────────
-  function renderAllStockRows(items) {
-    const tbody     = document.getElementById('allStockTbody');
-    const countEl   = document.getElementById('allStockCount');
-    const locations = window.__allStockLocations;
-    const colCount  = 5 + locations.length;
-
+    const countEl = document.getElementById('allStockCount');
     if (countEl) countEl.textContent = 'Showing ' + items.length + ' item' + (items.length !== 1 ? 's' : '');
 
+    renderAllStockRows(items);
+  }
+
+  // ── Table rows ────────────────────────────────────────────────────
+  function renderAllStockRows(items) {
+    const tbody     = document.getElementById('allStockTbody');
+    const locations = window.__allStockLocations;
+    const colCount  = 6 + locations.length;
+
     if (items.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted" style="padding:2rem;">No items match the current filter</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted" style="padding:2rem;">No items match the current filters</td></tr>`;
       return;
     }
 
@@ -146,12 +240,14 @@
       <tr>
         <td><code>${escapeHtml(i.itemCode)}</code></td>
         <td>${escapeHtml(i.itemName)}</td>
+        <td class="text-muted" style="font-size:0.83rem;">${escapeHtml(i.category || '—')}</td>
         <td>${escapeHtml(i.unit)}</td>
         ${locations.map(l => {
-          const b   = i.balances[l.storeCode] || { balance: 0, status: 'ZERO' };
-          const cls = b.balance > 0 ? '' : 'text-muted';
-          const bold = b.balance > 0 ? '<strong>' + b.balance + '</strong>' : '<span style="opacity:0.35;">0</span>';
-          return `<td class="text-end ${cls}">${bold}</td>`;
+          const b    = i.balances[l.storeCode] || { balance: 0, status: 'ZERO' };
+          const bold = b.balance > 0
+            ? '<strong>' + b.balance + '</strong>'
+            : '<span style="opacity:0.3;">0</span>';
+          return `<td class="text-end">${bold}</td>`;
         }).join('')}
         <td class="text-end" style="background:#eff6ff;"><strong>${i.total || 0}</strong></td>
         <td class="text-end text-muted">${i.minStock || '—'}</td>

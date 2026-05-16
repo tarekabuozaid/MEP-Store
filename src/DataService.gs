@@ -177,6 +177,7 @@ const DataService = (function() {
           itemCode: item.itemCode,
           itemName: item.itemName,
           unit:     item.unit,
+          category: item.category,
           location: loc,
           balance:  balance,
           minStock: item.minStock,

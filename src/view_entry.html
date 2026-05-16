@@ -74,7 +74,15 @@
                 <th style="width:220px;">Item Code</th>
                 <th>Name</th>
                 <th style="width:80px;">Unit</th>
-                <th style="width:130px;">Quantity</th>
+                <th style="width:130px;">
+                  Quantity
+                  <button class="btn btn-secondary btn-sm"
+                    onclick="showPasteQtyModal()"
+                    title="Paste quantities from Excel (one number per line)"
+                    style="font-size:0.7rem;padding:0.15rem 0.4rem;margin-left:4px;vertical-align:middle;">
+                    📋
+                  </button>
+                </th>
                 <th style="width:40px;"></th>
               </tr>
             </thead>
@@ -189,7 +197,14 @@
     return parsed;
   }
 
-  /** Validate pasted rows against Master_Items cache, show results in modal */
+  /** Validate pasted rows against Master_Items cache, show results in modal.
+   *
+   * Three tiers:
+   *  READY   — code found in master + valid qty → inserted as-is
+   *  WARNING — code found but qty missing/invalid → inserted with empty qty (user fills manually)
+   *  WARNING — code NOT in master → inserted as-is with note (new item, fill name manually or add via Admin)
+   *  ERROR   — completely unparseable row (no code at all)
+   */
   async function validatePaste() {
     const ta = document.getElementById('pasteTextarea');
     const valEl = document.getElementById('pasteValidation');
@@ -210,52 +225,84 @@
     items.forEach(i => { itemMap[i.itemCode.toUpperCase()] = i; });
 
     const parsed = parsePasteText(ta.value);
-    const valid = [];
-    const invalid = [];
+    const ready    = [];   // code found + qty ok
+    const warnings = [];   // code found but qty missing, OR code unknown
+    const errors   = [];   // truly unparseable (no code)
 
     parsed.forEach(row => {
-      if (!row.code) return;
+      if (!row.code) {
+        errors.push({ ...row, reason: 'Empty line or no item code' });
+        return;
+      }
+
       const item = itemMap[row.code.toUpperCase()];
       const qtyNum = row.qty;
-      const qtyOk = qtyNum !== null && !isNaN(qtyNum) && qtyNum !== 0;
+      const qtyOk  = qtyNum !== null && !isNaN(qtyNum) && qtyNum !== 0;
 
       if (!item) {
-        invalid.push({ ...row, reason: 'Item code not found in master list' });
+        // Unknown code — accept as new/unknown item with warning
+        warnings.push({
+          ...row,
+          item:    { itemCode: row.code, itemName: '', unit: '', minStock: 0 },
+          qty:     qtyOk ? qtyNum : null,
+          warnMsg: '⚠ Code not in master list — will be added as unknown item'
+        });
       } else if (!qtyOk) {
-        if (row.qtyRaw === '') {
-          // No qty provided — flag but allow user to fix manually
-          invalid.push({ ...row, item: item, reason: 'Quantity missing' });
-        } else {
-          invalid.push({ ...row, item: item, reason: 'Invalid quantity: "' + row.qtyRaw + '"' });
-        }
+        // Known code but qty missing/invalid — insert with empty qty
+        warnings.push({
+          ...row,
+          item:    item,
+          qty:     null,
+          warnMsg: row.qtyRaw === ''
+            ? '⚠ Quantity missing — fill manually after insert'
+            : '⚠ Invalid quantity "' + row.qtyRaw + '" — fill manually after insert'
+        });
       } else {
-        valid.push({ ...row, item: item, qty: qtyNum });
+        ready.push({ ...row, item: item, qty: qtyNum });
       }
     });
 
-    // Store for insertion
-    window.__pasteValidRows = valid;
+    // All insertable rows = ready + warnings (both get inserted)
+    window.__pasteValidRows = [...ready, ...warnings];
 
     // Build validation summary HTML
     let html = '';
-    if (valid.length > 0) {
-      html += '<div class="alert alert-success"><strong>✅ ' + valid.length + ' row(s) ready to insert:</strong><ul style="margin:0.4rem 0 0;font-size:0.82rem;">' +
-        valid.slice(0, 10).map(r =>
-          '<li><code>' + escapeHtml(r.code) + '</code> — ' + escapeHtml(r.item.itemName) +
-          ' — Qty: <strong>' + r.qty + '</strong> ' + escapeHtml(r.item.unit) + '</li>'
+
+    if (ready.length > 0) {
+      html += '<div class="alert alert-success" style="margin-bottom:0.5rem;">' +
+        '<strong>✅ ' + ready.length + ' row(s) ready:</strong>' +
+        '<ul style="margin:0.4rem 0 0;font-size:0.82rem;">' +
+        ready.slice(0, 8).map(r =>
+          '<li><code>' + escapeHtml(r.item.itemCode) + '</code> — ' +
+          escapeHtml(r.item.itemName) + ' — Qty: <strong>' + r.qty + '</strong> ' +
+          escapeHtml(r.item.unit) + '</li>'
         ).join('') +
-        (valid.length > 10 ? '<li class="text-muted">... and ' + (valid.length - 10) + ' more</li>' : '') +
+        (ready.length > 8 ? '<li class="text-muted">... and ' + (ready.length - 8) + ' more</li>' : '') +
         '</ul></div>';
     }
-    if (invalid.length > 0) {
-      html += '<div class="alert alert-error"><strong>❌ ' + invalid.length + ' row(s) skipped:</strong><ul style="margin:0.4rem 0 0;font-size:0.82rem;">' +
-        invalid.slice(0, 8).map(r =>
-          '<li>Line ' + r.lineNo + ': <code>' + escapeHtml(r.code) + '</code> — ' + escapeHtml(r.reason) + '</li>'
+
+    if (warnings.length > 0) {
+      html += '<div class="alert alert-warning" style="margin-bottom:0.5rem;">' +
+        '<strong>⚠ ' + warnings.length + ' row(s) inserted with warnings (fill manually):</strong>' +
+        '<ul style="margin:0.4rem 0 0;font-size:0.82rem;">' +
+        warnings.slice(0, 8).map(r =>
+          '<li><code>' + escapeHtml(r.item.itemCode) + '</code>' +
+          (r.item.itemName ? ' — ' + escapeHtml(r.item.itemName) : '') +
+          ' — ' + escapeHtml(r.warnMsg) + '</li>'
         ).join('') +
-        (invalid.length > 8 ? '<li class="text-muted">... and ' + (invalid.length - 8) + ' more</li>' : '') +
+        (warnings.length > 8 ? '<li class="text-muted">... and ' + (warnings.length - 8) + ' more</li>' : '') +
         '</ul></div>';
     }
-    if (valid.length === 0 && invalid.length === 0) {
+
+    if (errors.length > 0) {
+      html += '<div class="alert alert-error">' +
+        '<strong>❌ ' + errors.length + ' line(s) skipped (no code):</strong>' +
+        '<ul style="margin:0.4rem 0 0;font-size:0.82rem;">' +
+        errors.slice(0, 5).map(r => '<li>Line ' + r.lineNo + ': "' + escapeHtml(r.raw) + '" — ' + escapeHtml(r.reason) + '</li>').join('') +
+        '</ul></div>';
+    }
+
+    if (ready.length === 0 && warnings.length === 0 && errors.length === 0) {
       html = '<div class="alert alert-warning">No data found. Please check the format and try again.</div>';
     }
 
@@ -263,7 +310,10 @@
     validateBtn.disabled = false;
     validateBtn.textContent = '🔍 Validate';
 
-    if (valid.length > 0) {
+    // Insert button shows if there's anything to insert (ready OR warnings)
+    if (ready.length > 0 || warnings.length > 0) {
+      const total = ready.length + warnings.length;
+      insertBtn.textContent = '✅ Insert ' + total + ' Row(s)';
       insertBtn.classList.remove('hidden');
     } else {
       insertBtn.classList.add('hidden');
@@ -297,17 +347,29 @@
       tr.dataset.itemUnit = row.item.unit;
       tr.dataset.minStock = row.item.minStock;
 
+      const hasQty    = row.qty !== null && row.qty !== undefined;
+      const isNewItem = !row.item.itemName;  // code not in master
+
       tr.innerHTML = `
         <td>${idx}</td>
         <td>
           <div class="autocomplete-wrap">
-            <input type="text" class="item-code" value="${escapeHtml(row.item.itemCode)}" oninput="onItemCodeInput(this)" autocomplete="off">
+            <input type="text" class="item-code" value="${escapeHtml(row.item.itemCode)}"
+              oninput="onItemCodeInput(this)" autocomplete="off"
+              style="${isNewItem ? 'border-color:var(--color-warning);' : ''}">
           </div>
         </td>
-        <td><span class="item-name">${escapeHtml(row.item.itemName)}</span></td>
-        <td><span class="item-unit">${escapeHtml(row.item.unit)}</span></td>
         <td>
-          <input type="number" class="item-qty" value="${row.qty}" step="any" oninput="onQtyInput(this)">
+          <span class="item-name ${isNewItem ? 'text-warning' : ''}">
+            ${isNewItem ? '⚠ New item' : escapeHtml(row.item.itemName)}
+          </span>
+        </td>
+        <td><span class="item-unit text-muted">${escapeHtml(row.item.unit || '—')}</span></td>
+        <td>
+          <input type="number" class="item-qty" value="${hasQty ? row.qty : ''}" step="any"
+            oninput="onQtyInput(this)"
+            placeholder="${hasQty ? '' : 'Enter qty'}"
+            style="${hasQty ? '' : 'border-color:var(--color-warning);'}">
           <div class="balance-hint"></div>
         </td>
         <td><button class="btn btn-secondary btn-sm" onclick="removeItemRow(this)" title="Remove row">✕</button></td>
@@ -569,6 +631,113 @@
     }
     box.innerHTML = html;
     if (html) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // ─── Paste Quantities Feature ───────────────────────────────────
+
+  /**
+   * Paste a column of quantities from Excel into existing item rows.
+   * One number per line → mapped to rows in order (top to bottom).
+   * Rows without a qty in the paste are left unchanged.
+   */
+  function showPasteQtyModal() {
+    const rows = document.querySelectorAll('#itemsTbody tr');
+    const count = rows.length;
+
+    showModal(`
+      <h3>📋 Paste Quantities</h3>
+      <p class="text-muted" style="font-size:0.88rem;margin-bottom:0.75rem;">
+        Copy a single column of quantities from Excel, then paste below.<br>
+        Numbers are mapped to rows <strong>in order</strong> — one number per line.
+        ${count > 0 ? '<br>Currently <strong>' + count + ' row(s)</strong> in the table.' : ''}
+      </p>
+
+      <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;
+                  padding:0.6rem 0.75rem;font-family:monospace;font-size:0.78rem;
+                  color:#6b7280;margin-bottom:0.75rem;">
+        Example:&nbsp;&nbsp;10<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;← leaves row unchanged
+      </div>
+
+      <textarea id="pasteQtyTextarea"
+        rows="8"
+        style="font-family:monospace;font-size:0.9rem;resize:vertical;"
+        placeholder="Paste quantities here (Ctrl+V)..."
+        oninput="onPasteQtyInput(this)"></textarea>
+
+      <div id="pasteQtyPreview" style="margin-top:0.6rem;font-size:0.82rem;color:#6b7280;"></div>
+
+      <div class="modal-actions" style="margin-top:1rem;">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-success" onclick="applyPastedQty()">✅ Apply Quantities</button>
+      </div>
+    `);
+
+    setTimeout(() => {
+      const ta = document.getElementById('pasteQtyTextarea');
+      if (ta) ta.focus();
+    }, 100);
+  }
+
+  function onPasteQtyInput(ta) {
+    const nums = parseQtyList(ta.value);
+    const preview = document.getElementById('pasteQtyPreview');
+    if (!preview) return;
+    if (nums.length === 0) { preview.textContent = ''; return; }
+
+    const rows = document.querySelectorAll('#itemsTbody tr');
+    const mapped = Math.min(nums.length, rows.length);
+    preview.innerHTML =
+      nums.length + ' number(s) detected → will fill <strong>' + mapped + '</strong> row(s)' +
+      (nums.length > rows.length
+        ? ' <span class="text-warning">(extra numbers ignored — add more rows first)</span>'
+        : '') +
+      (nums.length < rows.length
+        ? ' <span class="text-muted">(remaining ' + (rows.length - nums.length) + ' rows unchanged)</span>'
+        : '');
+  }
+
+  /** Parse pasted text into array of numbers. Skips blanks and zeros. */
+  function parseQtyList(text) {
+    return text.split('\n')
+      .map(l => l.trim().replace(/,/g, '.'))   // handle comma decimals
+      .filter(l => l !== '')
+      .map(l => parseFloat(l))
+      .filter(n => !isNaN(n));
+  }
+
+  /** Apply parsed quantities to table rows in order. */
+  function applyPastedQty() {
+    const ta = document.getElementById('pasteQtyTextarea');
+    if (!ta || !ta.value.trim()) return;
+
+    const nums = parseQtyList(ta.value);
+    if (nums.length === 0) {
+      showToast('No valid numbers found', 'error');
+      return;
+    }
+
+    const rows = document.querySelectorAll('#itemsTbody tr');
+    let applied = 0;
+
+    rows.forEach((tr, idx) => {
+      if (idx >= nums.length) return;          // no more numbers
+      const qty = nums[idx];
+      if (qty === 0) return;                   // 0 = skip this row
+
+      const qtyInput = tr.querySelector('.item-qty');
+      if (qtyInput) {
+        qtyInput.value = qty;
+        qtyInput.style.borderColor = '';       // clear any warning highlight
+        updateBalanceHint(tr);
+        applied++;
+      }
+    });
+
+    closeModal();
+    showToast('✅ ' + applied + ' quantity/quantities applied', 'success');
   }
 
   function resetEntry(keepAlerts) {

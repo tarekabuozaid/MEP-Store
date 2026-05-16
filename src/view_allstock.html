@@ -17,37 +17,46 @@
           unit:     r.unit,
           minStock: r.minStock,
           balances: {},
-          total:    0
+          total:    0,
+          hasAny:   false
         };
       }
       itemMap[r.itemCode].balances[r.location] = { balance: r.balance, status: r.status };
       itemMap[r.itemCode].total += r.balance;
+      if (r.balance > 0) itemMap[r.itemCode].hasAny = true;
     });
 
-    const items = Object.values(itemMap).sort((a, b) => a.itemCode.localeCompare(b.itemCode));
+    const items = Object.values(itemMap);
+    const inStockTotal = items.filter(i => i.total > 0).length;
 
     container.innerHTML = `
       <div class="card">
-        <div class="card-header"><h2>📦 Stock Balances — All Stores</h2></div>
-
-        <div class="flex-gap mb-2" style="align-items:center;">
-          <input type="text" id="allStockSearch" placeholder="🔍 Search..." style="flex:1;" oninput="filterAllStock()">
-          <label class="flex" style="align-items:center;gap:0.3rem;font-weight:normal;">
-            <input type="checkbox" id="allStockLowOnly" onchange="filterAllStock()" style="width:auto;">
-            Low stock only
-          </label>
+        <div class="card-header">
+          <h2>📦 Stock Balances — All Stores</h2>
+          <span class="text-muted" style="font-size:0.85rem;">${inStockTotal} items with stock across all stores</span>
         </div>
+
+        <div class="flex-gap mb-2" style="align-items:center;flex-wrap:wrap;">
+          <div class="btn-group" id="allStockFilterBtns">
+            <button class="btn btn-sm btn-secondary" data-filter="instock" onclick="setAllStockFilter('instock')">In Stock</button>
+            <button class="btn btn-sm btn-secondary" data-filter="alerts"  onclick="setAllStockFilter('alerts')">⚠ Alerts</button>
+            <button class="btn btn-sm btn-secondary" data-filter="all"     onclick="setAllStockFilter('all')">All</button>
+          </div>
+          <input type="text" id="allStockSearch" placeholder="🔍 Search code or name…"
+                 style="flex:1;min-width:160px;" oninput="applyAllStockFilters()">
+        </div>
+        <div id="allStockCount" class="text-muted" style="font-size:0.82rem;padding:0.25rem 0;margin-bottom:0.5rem;"></div>
 
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Code</th>
+                <th onclick="sortAllStock('itemCode')" style="cursor:pointer;">Code ↕</th>
                 <th>Item</th>
                 <th>Unit</th>
                 ${locations.map(l => `<th class="text-end">${escapeHtml(l.storeName)}<br><small class="text-muted">${escapeHtml(l.storeCode)}</small></th>`).join('')}
-                <th class="text-end" style="background:#1d4ed8;">Total</th>
-                <th class="text-end">Min Stock</th>
+                <th class="text-end" onclick="sortAllStock('total')" style="cursor:pointer;background:#1d4ed8;color:#fff;">Total ↕</th>
+                <th class="text-end">Min</th>
               </tr>
             </thead>
             <tbody id="allStockTbody"></tbody>
@@ -56,37 +65,80 @@
       </div>
     `;
 
-    window.__allStockData = items;
+    window.__allStockData      = items;
     window.__allStockLocations = locations;
-    renderAllStockRows(items);
+    window.__allStockSort      = { col: 'total', dir: -1 };  // highest total first
+    window.__allStockFilter    = 'instock';                   // default: In Stock
+
+    setAllStockFilter('instock', false);
   }
 
-  function filterAllStock() {
+  // ── Quick-filter button ──────────────────────────────────────────
+  function setAllStockFilter(filter, noRefresh) {
+    window.__allStockFilter = filter;
+    document.querySelectorAll('#allStockFilterBtns .btn').forEach(function(btn) {
+      const active = btn.dataset.filter === filter;
+      btn.classList.toggle('btn-primary',   active);
+      btn.classList.toggle('btn-secondary', !active);
+    });
+    if (!noRefresh) applyAllStockFilters();
+  }
+
+  // ── Sort column ──────────────────────────────────────────────────
+  function sortAllStock(col) {
+    const s = window.__allStockSort;
+    s.dir = (s.col === col) ? s.dir * -1 : -1;
+    s.col = col;
+    applyAllStockFilters();
+  }
+
+  // ── Combined filter + sort + render ─────────────────────────────
+  function applyAllStockFilters() {
     const search = (document.getElementById('allStockSearch').value || '').toLowerCase();
-    const lowOnly = document.getElementById('allStockLowOnly').checked;
-    let filtered = window.__allStockData;
+    const filter = window.__allStockFilter || 'instock';
+    const { col, dir } = window.__allStockSort;
+
+    let filtered = window.__allStockData.slice();
+
+    // Quick filter
+    if (filter === 'instock') {
+      filtered = filtered.filter(i => i.total > 0);
+    } else if (filter === 'alerts') {
+      filtered = filtered.filter(i => {
+        if (i.minStock > 0 && i.total < i.minStock) return true;
+        return Object.values(i.balances).some(b => b.status !== 'OK');
+      });
+    }
+
+    // Text search
     if (search) {
       filtered = filtered.filter(i =>
         i.itemCode.toLowerCase().includes(search) ||
         i.itemName.toLowerCase().includes(search)
       );
     }
-    if (lowOnly) {
-      filtered = filtered.filter(i => {
-        if (i.minStock > 0 && i.total < i.minStock) return true;
-        return Object.values(i.balances).some(b => b.status !== 'OK');
-      });
-    }
+
+    // Sort
+    filtered.sort(function(a, b) {
+      const va = typeof a[col] === 'string' ? a[col].toLowerCase() : (a[col] || 0);
+      const vb = typeof b[col] === 'string' ? b[col].toLowerCase() : (b[col] || 0);
+      return va < vb ? -dir : va > vb ? dir : 0;
+    });
+
     renderAllStockRows(filtered);
   }
 
+  // ── Table rows ───────────────────────────────────────────────────
   function renderAllStockRows(items) {
-    const tbody = document.getElementById('allStockTbody');
+    const tbody     = document.getElementById('allStockTbody');
+    const countEl   = document.getElementById('allStockCount');
     const locations = window.__allStockLocations;
-    const colCount = 5 + locations.length;
+    const colCount  = 5 + locations.length;
+
+    if (countEl) countEl.textContent = 'Showing ' + items.length + ' item' + (items.length !== 1 ? 's' : '');
 
     if (items.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted" style="padding:2rem;">No items found</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted" style="padding:2rem;">No items match the current filter</td></tr>`;
       return;
     }
 
@@ -96,11 +148,12 @@
         <td>${escapeHtml(i.itemName)}</td>
         <td>${escapeHtml(i.unit)}</td>
         ${locations.map(l => {
-          const b = i.balances[l.storeCode] || { balance: 0, status: 'ZERO' };
-          const cls = b.status === 'ZERO' ? 'text-danger' : (b.status === 'LOW' ? 'text-warning' : '');
-          return `<td class="text-end ${cls}"><strong>${b.balance}</strong></td>`;
+          const b   = i.balances[l.storeCode] || { balance: 0, status: 'ZERO' };
+          const cls = b.balance > 0 ? '' : 'text-muted';
+          const bold = b.balance > 0 ? '<strong>' + b.balance + '</strong>' : '<span style="opacity:0.35;">0</span>';
+          return `<td class="text-end ${cls}">${bold}</td>`;
         }).join('')}
-        <td class="text-end" style="background:#eff6ff;"><strong>${i.total}</strong></td>
+        <td class="text-end" style="background:#eff6ff;"><strong>${i.total || 0}</strong></td>
         <td class="text-end text-muted">${i.minStock || '—'}</td>
       </tr>
     `).join('');

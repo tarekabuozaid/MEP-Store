@@ -76,29 +76,40 @@ const ReportService = (function() {
       })
       .slice(0, CONFIG.DASHBOARD_RECENT_LIMIT);
 
-    // Items per location
-    const totalItemsByLocation = locations.map(loc => {
-      const itemSet = new Set();
-      movements.forEach(m => {
-        if (m.location === loc.storeCode) itemSet.add(m.itemCode);
+    // Per-location stock summary using pre-computed balMap (O(items × locations))
+    const locationSummary = locations.map(function(loc) {
+      const locCode = loc.storeCode.toUpperCase();
+      let inStockCount = 0, lowCount = 0, zeroCount = 0;
+      items.forEach(function(item) {
+        const key = item.itemCode.toUpperCase() + ':' + locCode;
+        if (!(key in balMap)) return;   // item never stocked here — skip
+        const balance = balMap[key];
+        if (balance > 0) {
+          inStockCount++;
+          if (item.minStock > 0 && balance < item.minStock) lowCount++;
+        } else {
+          zeroCount++;
+        }
       });
       return {
-        location: loc.storeCode,
+        location:     loc.storeCode,
         locationName: loc.storeName,
-        itemCount: itemSet.size
+        inStockCount: inStockCount,
+        lowCount:     lowCount,
+        zeroCount:    zeroCount
       };
     });
 
     return {
-      todayCount: todayTxns.filter(t => !t.txnId.endsWith('-IN')).length,
-      todayByType: todayByType,
-      lowStockCount: lowStockItems.length,
-      zeroStockCount: lowStockItems.filter(i => i.status === 'ZERO').length,
-      lowStockItems: lowStockItems.slice(0, 20),
-      recentTransactions: recent,
-      totalItemsByLocation: totalItemsByLocation,
-      locationCount: locations.length,
-      itemCount: items.length
+      todayCount:          todayTxns.filter(t => !t.txnId.endsWith('-IN')).length,
+      todayByType:         todayByType,
+      lowStockCount:       lowStockItems.length,
+      zeroStockCount:      lowStockItems.filter(i => i.status === 'ZERO').length,
+      lowStockItems:       lowStockItems.slice(0, 20),
+      recentTransactions:  recent,
+      locationSummary:     locationSummary,
+      locationCount:       locations.length,
+      itemCount:           items.length
     };
   }
 

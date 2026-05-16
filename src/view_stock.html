@@ -1,88 +1,182 @@
 <script>
-  // ─── Stock View (Keeper: own store / Admin: all stores) ──────
+  // ─── Stock View (Keeper: own store / Admin: pick store) ──────────
   async function renderStockView(container) {
     container.innerHTML = '<div class="card"><div class="text-center"><div class="spinner"></div></div></div>';
-    const stock = await callApi('api_getMyStock');
-    const locName = App.user.role === 'Admin'
-      ? 'All Stores'
-      : ((await getLocations()).find(l => l.storeCode === App.user.storeCode) || {}).storeName || App.user.storeCode;
 
-    const totalItems = stock.length;
-    const lowCount = stock.filter(s => s.status === 'LOW').length;
-    const zeroCount = stock.filter(s => s.status === 'ZERO').length;
+    const [stock, locations] = await Promise.all([
+      callApi('api_getMyStock'),
+      getLocations()
+    ]);
+
+    const isAdmin = App.user.role === 'Admin';
+
+    // Build location options for Admin
+    const locOptions = isAdmin
+      ? ['<option value="">All Stores</option>',
+         ...locations.map(l =>
+           `<option value="${escapeHtml(l.storeCode)}">${escapeHtml(l.storeName)} (${escapeHtml(l.storeCode)})</option>`)
+        ].join('')
+      : '';
 
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
-          <h2>📦 Stock: ${escapeHtml(locName)}</h2>
+          <h2>📦 Stock</h2>
         </div>
 
-        <div class="kpi-grid">
-          <div class="kpi kpi-success"><div class="kpi-label">Total Items</div><div class="kpi-value">${totalItems}</div></div>
-          <div class="kpi kpi-warning"><div class="kpi-label">Below Minimum</div><div class="kpi-value">${lowCount}</div></div>
-          <div class="kpi kpi-danger"><div class="kpi-label">Out of Stock</div><div class="kpi-value">${zeroCount}</div></div>
-        </div>
+        <!-- KPI bar -->
+        <div class="kpi-grid" id="stockKpis"></div>
 
-        <div class="flex-gap mb-2" style="align-items:center;">
-          <input type="text" id="stockSearch" placeholder="🔍 Search by code or name..." style="flex:1;" oninput="filterStock()">
-          <label class="flex" style="align-items:center;gap:0.3rem;font-weight:normal;">
-            <input type="checkbox" id="lowOnly" onchange="filterStock()" style="width:auto;">
-            Low stock only
-          </label>
+        <!-- Filter bar -->
+        <div class="flex-gap mb-2" style="align-items:center;flex-wrap:wrap;">
+          <div class="btn-group" id="stockFilterBtns">
+            <button class="btn btn-sm btn-secondary" data-filter="instock" onclick="setStockFilter('instock')">In Stock</button>
+            <button class="btn btn-sm btn-secondary" data-filter="alerts"  onclick="setStockFilter('alerts')">⚠ Alerts</button>
+            <button class="btn btn-sm btn-secondary" data-filter="all"     onclick="setStockFilter('all')">All</button>
+          </div>
+          ${isAdmin ? `
+          <select id="stockLocFilter" onchange="applyStockFilters()" style="min-width:180px;">
+            ${locOptions}
+          </select>` : ''}
+          <input type="text" id="stockSearch" placeholder="🔍 Search code or name…"
+                 style="flex:1;min-width:160px;" oninput="applyStockFilters()">
         </div>
 
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Code</th>
+                <th onclick="sortStock('itemCode')" style="cursor:pointer;">Code ↕</th>
                 <th>Name</th>
-                ${App.user.role === 'Admin' ? '<th>Location</th>' : ''}
-                <th class="text-end">Balance</th>
+                ${isAdmin ? '<th onclick="sortStock(\'location\')" style="cursor:pointer;">Location ↕</th>' : ''}
+                <th class="text-end" onclick="sortStock('balance')" style="cursor:pointer;">Balance ↕</th>
                 <th>Unit</th>
-                <th class="text-end">Min Stock</th>
+                <th class="text-end">Min</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody id="stockTbody"></tbody>
           </table>
         </div>
+        <div id="stockCount" class="text-muted" style="font-size:0.82rem;padding:0.4rem 0;"></div>
       </div>
     `;
 
-    window.__stockData = stock;
-    renderStockRows(stock);
+    window.__stockData    = stock;
+    window.__stockSort    = { col: 'balance', dir: -1 };   // default: highest balance first
+    window.__stockFilter  = 'instock';                      // default: In Stock
+
+    setStockFilter('instock', /*noRefresh*/ false);
   }
 
-  function filterStock() {
-    const search = (document.getElementById('stockSearch').value || '').toLowerCase();
-    const lowOnly = document.getElementById('lowOnly').checked;
-    let filtered = window.__stockData;
+  // ── Quick-filter button selection ────────────────────────────────
+  function setStockFilter(filter, noRefresh) {
+    window.__stockFilter = filter;
+    document.querySelectorAll('#stockFilterBtns .btn').forEach(function(btn) {
+      const active = btn.dataset.filter === filter;
+      btn.classList.toggle('btn-primary',   active);
+      btn.classList.toggle('btn-secondary', !active);
+    });
+    if (!noRefresh) applyStockFilters();
+  }
+
+  // ── Sort ─────────────────────────────────────────────────────────
+  function sortStock(col) {
+    const s = window.__stockSort;
+    s.dir = (s.col === col) ? s.dir * -1 : -1;
+    s.col = col;
+    applyStockFilters();
+  }
+
+  // ── Combined filter + sort + render ─────────────────────────────
+  function applyStockFilters() {
+    const search    = (document.getElementById('stockSearch')     ? document.getElementById('stockSearch').value     : '').toLowerCase();
+    const locFilter = document.getElementById('stockLocFilter')   ? document.getElementById('stockLocFilter').value  : '';
+    const filter    = window.__stockFilter || 'instock';
+    const { col, dir } = window.__stockSort;
+
+    let rows = window.__stockData.slice();
+
+    // Location filter (Admin only)
+    if (locFilter) {
+      rows = rows.filter(s => s.location === locFilter);
+    }
+
+    // Quick filter
+    if (filter === 'instock') {
+      rows = rows.filter(s => s.balance > 0);
+    } else if (filter === 'alerts') {
+      rows = rows.filter(s => s.status !== 'OK');
+    }
+
+    // Text search
     if (search) {
-      filtered = filtered.filter(s =>
+      rows = rows.filter(s =>
         s.itemCode.toLowerCase().includes(search) ||
         s.itemName.toLowerCase().includes(search)
       );
     }
-    if (lowOnly) {
-      filtered = filtered.filter(s => s.status !== 'OK');
-    }
-    renderStockRows(filtered);
+
+    // Sort
+    rows.sort(function(a, b) {
+      const va = typeof a[col] === 'string' ? a[col].toLowerCase() : (a[col] || 0);
+      const vb = typeof b[col] === 'string' ? b[col].toLowerCase() : (b[col] || 0);
+      return va < vb ? -dir : va > vb ? dir : 0;
+    });
+
+    updateStockKpis(rows);
+    renderStockRows(rows);
   }
 
+  // ── KPI bar ──────────────────────────────────────────────────────
+  function updateStockKpis(visibleRows) {
+    const all      = window.__stockData;
+    const inStock  = all.filter(s => s.balance > 0).length;
+    const low      = all.filter(s => s.status === 'LOW').length;
+    const zero     = all.filter(s => s.status === 'ZERO').length;
+
+    const el = document.getElementById('stockKpis');
+    if (!el) return;
+    el.innerHTML = `
+      <div class="kpi kpi-success" style="cursor:pointer;" onclick="setStockFilter('instock')">
+        <div class="kpi-label">In Stock</div>
+        <div class="kpi-value">${inStock}</div>
+      </div>
+      <div class="kpi kpi-warning" style="cursor:pointer;" onclick="setStockFilter('alerts')">
+        <div class="kpi-label">Below Min</div>
+        <div class="kpi-value">${low}</div>
+      </div>
+      <div class="kpi kpi-danger" style="cursor:pointer;" onclick="setStockFilter('alerts')">
+        <div class="kpi-label">Zero Stock</div>
+        <div class="kpi-value">${zero}</div>
+      </div>
+      <div class="kpi" style="cursor:pointer;" onclick="setStockFilter('all')">
+        <div class="kpi-label">Total Items</div>
+        <div class="kpi-value">${all.length}</div>
+      </div>
+    `;
+  }
+
+  // ── Table rows ───────────────────────────────────────────────────
   function renderStockRows(rows) {
-    const tbody = document.getElementById('stockTbody');
+    const tbody    = document.getElementById('stockTbody');
+    const countEl  = document.getElementById('stockCount');
+    const isAdmin  = App.user.role === 'Admin';
+    const cols     = isAdmin ? 7 : 6;
+
     if (rows.length === 0) {
-      const cols = App.user.role === 'Admin' ? 7 : 6;
-      tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center text-muted" style="padding:2rem;">No items found</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center text-muted" style="padding:2rem;">No items match the current filter</td></tr>`;
+      if (countEl) countEl.textContent = '';
       return;
     }
+
+    if (countEl) countEl.textContent = 'Showing ' + rows.length + ' item' + (rows.length !== 1 ? 's' : '');
 
     tbody.innerHTML = rows.map(s => `
       <tr>
         <td><code>${escapeHtml(s.itemCode)}</code></td>
         <td>${escapeHtml(s.itemName)}</td>
-        ${App.user.role === 'Admin' ? `<td>${escapeHtml(s.location)}</td>` : ''}
+        ${isAdmin ? `<td>${escapeHtml(s.location)}</td>` : ''}
         <td class="text-end"><strong>${s.balance}</strong></td>
         <td>${escapeHtml(s.unit)}</td>
         <td class="text-end text-muted">${s.minStock || '—'}</td>

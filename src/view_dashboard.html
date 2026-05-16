@@ -14,26 +14,36 @@
         <span class="text-muted">${formatDate(new Date())}</span>
       </div>
 
+      <!-- Top KPIs -->
       <div class="kpi-grid">
         <div class="kpi"><div class="kpi-label">Today's Transactions</div><div class="kpi-value">${data.todayCount}</div></div>
         <div class="kpi kpi-warning"><div class="kpi-label">Below Minimum</div><div class="kpi-value">${data.lowStockCount}</div></div>
         <div class="kpi kpi-danger"><div class="kpi-label">Out of Stock</div><div class="kpi-value">${data.zeroStockCount}</div></div>
-        <div class="kpi kpi-success"><div class="kpi-label">Stores</div><div class="kpi-value">${data.locationCount}</div></div>
+        <div class="kpi kpi-success"><div class="kpi-label">Active Stores</div><div class="kpi-value">${data.locationCount}</div></div>
         <div class="kpi"><div class="kpi-label">Total Items</div><div class="kpi-value">${data.itemCount}</div></div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" id="dashGrid">
+      <!-- Store Overview -->
+      <div class="card" style="margin-bottom:1rem;">
+        <div class="card-header"><h2>🏪 Store Overview</h2></div>
+        <div id="storeOverviewGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.85rem;padding:0.25rem 0;">
+          ${renderStoreOverview(data.locationSummary || [])}
+        </div>
+      </div>
+
+      <!-- Activity + Alerts -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;" id="dashGrid">
         <div class="card">
-          <div class="card-header"><h2>📈 Today's Activity Breakdown</h2></div>
+          <div class="card-header"><h2>📈 Today's Activity</h2></div>
           ${renderTxnDistribution(data.todayByType)}
         </div>
-
         <div class="card">
           <div class="card-header"><h2>⚠ Stock Alerts</h2></div>
           ${renderLowStockList(data.lowStockItems)}
         </div>
       </div>
 
+      <!-- Recent Transactions -->
       <div class="card">
         <div class="card-header"><h2>🕐 Last ${data.recentTransactions.length} Transactions</h2></div>
         <div class="table-wrap">
@@ -74,6 +84,48 @@
     }
   }
 
+  // ── Store Overview cards ─────────────────────────────────────────
+  function renderStoreOverview(summary) {
+    if (!summary || summary.length === 0) {
+      return '<div class="text-muted text-center" style="padding:1rem;grid-column:1/-1;">No store data available</div>';
+    }
+
+    return summary.map(function(s) {
+      const total = s.inStockCount + s.zeroCount;
+      const healthPct = total > 0 ? Math.round((s.inStockCount / total) * 100) : 0;
+
+      // Color: green ≥ 80%, yellow ≥ 50%, red < 50%
+      const barColor = healthPct >= 80 ? '#16a34a' : healthPct >= 50 ? '#d97706' : '#dc2626';
+      const cardBorder = s.inStockCount === 0 ? 'border-color:#fca5a5;' : '';
+
+      return `
+        <div class="card" style="margin:0;padding:0.85rem 1rem;${cardBorder}">
+          <div style="font-weight:700;font-size:0.95rem;margin-bottom:0.1rem;">${escapeHtml(s.locationName)}</div>
+          <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.6rem;">${escapeHtml(s.location)}</div>
+
+          <div style="font-size:2rem;font-weight:800;line-height:1;color:${s.inStockCount > 0 ? 'var(--color-primary)' : '#9ca3af'};">
+            ${s.inStockCount}
+          </div>
+          <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.5rem;">items in stock</div>
+
+          <div style="background:#f3f4f6;height:6px;border-radius:3px;overflow:hidden;margin-bottom:0.45rem;">
+            <div style="background:${barColor};height:100%;width:${healthPct}%;transition:width 0.4s;"></div>
+          </div>
+
+          <div style="display:flex;gap:0.5rem;font-size:0.75rem;">
+            ${s.lowCount  > 0 ? `<span style="color:#d97706;">⚠ ${s.lowCount} low</span>` : ''}
+            ${s.zeroCount > 0 ? `<span style="color:#dc2626;">🔴 ${s.zeroCount} zero</span>` : ''}
+            ${s.lowCount === 0 && s.zeroCount === 0 && s.inStockCount > 0
+              ? '<span style="color:#16a34a;">✓ All OK</span>'
+              : ''}
+            ${s.inStockCount === 0 ? '<span style="color:#9ca3af;">Empty store</span>' : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ── Today's activity bar chart ────────────────────────────────────
   function renderTxnDistribution(byType) {
     const total = Object.values(byType).reduce((a, b) => a + b, 0);
     if (total === 0) {
@@ -89,7 +141,7 @@
 
     return '<div>' + items.map(it => {
       const count = byType[it.type] || 0;
-      const pct = total > 0 ? (count / total) * 100 : 0;
+      const pct   = total > 0 ? (count / total) * 100 : 0;
       return `
         <div style="margin-bottom:0.85rem;">
           <div class="flex-between" style="margin-bottom:0.25rem;">
@@ -104,6 +156,7 @@
     }).join('') + '</div>';
   }
 
+  // ── Stock alerts list ─────────────────────────────────────────────
   function renderLowStockList(items) {
     if (items.length === 0) {
       return '<div class="text-center text-success" style="padding:2rem;">✓ All items above minimum stock</div>';

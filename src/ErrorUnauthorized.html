@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Access Denied</title>
+  <title>Access Denied — Aldhafra IMS</title>
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Segoe UI', 'Inter', Tahoma, Arial, sans-serif;
-      margin: 0;
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -15,68 +15,133 @@
       background: linear-gradient(135deg, #1a3c5e 0%, #2563eb 100%);
       padding: 1rem;
     }
-    .error-card {
+    .card {
       background: white;
-      border-radius: 12px;
-      padding: 2.5rem;
-      max-width: 480px;
+      border-radius: 14px;
+      padding: 2.5rem 2rem;
+      max-width: 500px;
       width: 100%;
       text-align: center;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.25);
     }
-    .icon {
-      font-size: 4rem;
-      margin-bottom: 1rem;
-    }
-    h1 {
-      color: #dc2626;
-      margin: 0 0 0.5rem;
-      font-size: 1.5rem;
-    }
-    p {
-      color: #4b5563;
-      margin: 0.5rem 0;
-      line-height: 1.6;
-    }
-    .message {
+    .icon { font-size: 3.5rem; margin-bottom: 1rem; }
+    h1 { color: #dc2626; font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .subtitle { color: #6b7280; font-size: 0.95rem; margin-bottom: 1.5rem; }
+
+    /* Email chip */
+    .email-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
       background: #fef2f2;
-      border: 1px solid #fecaca;
-      padding: 1rem;
-      border-radius: 8px;
-      margin: 1.5rem 0;
-      color: #7f1d1d;
-      font-size: 0.95rem;
-      word-break: break-word;
+      border: 1.5px solid #fca5a5;
+      border-radius: 999px;
+      padding: 0.45rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #b91c1c;
+      margin-bottom: 1.5rem;
+      word-break: break-all;
     }
-    .help {
+
+    /* Message box */
+    .message-box {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 8px;
+      padding: 1rem;
+      color: #92400e;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      text-align: left;
+      margin-bottom: 1.5rem;
+    }
+    .message-box strong { color: #78350f; }
+
+    /* Steps */
+    .steps {
       background: #eff6ff;
       border-left: 4px solid #2563eb;
-      padding: 1rem;
-      border-radius: 6px;
-      margin-top: 1.25rem;
+      border-radius: 0 8px 8px 0;
+      padding: 1rem 1rem 1rem 1.25rem;
       text-align: left;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       color: #1e40af;
+      margin-bottom: 1.5rem;
     }
-    .footer {
-      margin-top: 1.5rem;
-      color: #9ca3af;
+    .steps strong { display: block; margin-bottom: 0.5rem; color: #1d4ed8; font-size: 0.92rem; }
+    .steps ol { padding-left: 1.2rem; }
+    .steps li { margin-bottom: 0.35rem; line-height: 1.5; }
+    .steps code {
+      background: #dbeafe;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      font-family: monospace;
       font-size: 0.85rem;
     }
+
+    /* Retry button */
+    .btn-retry {
+      display: inline-block;
+      background: #2563eb;
+      color: white;
+      padding: 0.6rem 1.5rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      margin-bottom: 1rem;
+      transition: background 0.15s;
+    }
+    .btn-retry:hover { background: #1d4ed8; }
+
+    .footer { color: #9ca3af; font-size: 0.8rem; margin-top: 0.5rem; }
   </style>
 </head>
 <body>
-  <div class="error-card">
+  <div class="card">
     <div class="icon">🔒</div>
     <h1>Access Denied</h1>
-    <div class="message"><?!= message ?></div>
-    <div class="help">
-      <strong>To get access:</strong><br>
-      Contact your system administrator to add your email to the authorized users list.
+    <p class="subtitle">Your Google account is not authorized to use this system.</p>
+
+    <!-- Show detected email prominently -->
+    <div class="email-chip">
+      📧 <?!= detectedEmail || 'Unknown account' ?>
     </div>
-    <div class="footer">
-      Aldhafra IMS v2.0
+
+    <!-- Message from server -->
+    <? if (messageType === 'not_identified') { ?>
+    <div class="message-box">
+      <strong>⚠ Could not identify your Google account.</strong><br>
+      Make sure you are signed in with a Google account before opening this link.
+      Try signing out and back in, then open the link again.
     </div>
+    <? } else { ?>
+    <div class="message-box">
+      <strong>This email is not registered in the system.</strong><br>
+      The email shown above was detected but has no authorized account record.
+      Contact the system administrator and provide them with your exact email address.
+    </div>
+    <? } ?>
+
+    <!-- Steps for the admin -->
+    <div class="steps">
+      <strong>📋 For the System Administrator:</strong>
+      <ol>
+        <li>Open the app → <strong>Admin</strong> → <strong>Users</strong> tab</li>
+        <li>Click <strong>+ Add User</strong></li>
+        <li>Enter the email exactly as shown above:<br>
+          <code><?!= detectedEmail || '' ?></code>
+        </li>
+        <li>Assign a Role and Store, then save</li>
+        <li>Ask the user to refresh this page</li>
+      </ol>
+    </div>
+
+    <a class="btn-retry" href="javascript:window.location.reload()">↺ Try Again</a>
+    <div class="footer">Aldhafra IMS v2.0</div>
   </div>
 </body>
 </html>

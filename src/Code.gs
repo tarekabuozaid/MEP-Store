@@ -11,10 +11,12 @@
  * @returns {HtmlOutput} HTML page to render
  */
 function doGet(e) {
+  // With executeAs=USER_DEPLOYING + access=ANYONE_WITH_GOOGLE_ACCOUNT,
+  // getActiveUser() reliably returns the visiting user's email.
   const email = (Session.getActiveUser() && Session.getActiveUser().getEmail()) || '';
 
   if (!email) {
-    return renderUnauthorized_('Your account could not be identified. Please make sure you are signed in with a Google account.');
+    return renderUnauthorized_('', 'not_identified');
   }
 
   let user;
@@ -30,7 +32,7 @@ function doGet(e) {
         ip: e && e.parameter ? JSON.stringify(e.parameter) : 'unknown'
       });
     } catch (e2) { /* ignore audit failure */ }
-    return renderUnauthorized_('The email ' + email + ' is not registered in the system.');
+    return renderUnauthorized_(email, 'not_registered');
   }
 
   // Successful login — log it
@@ -58,13 +60,40 @@ function include(filename) {
 
 /**
  * Render the unauthorized error page.
+ * @param {string} detectedEmail - The email that was detected (or '' if unknown)
+ * @param {string} messageType   - 'not_identified' | 'not_registered'
  */
-function renderUnauthorized_(message) {
+function renderUnauthorized_(detectedEmail, messageType) {
   const template = HtmlService.createTemplateFromFile('ErrorUnauthorized');
-  template.message = message || 'Access denied';
+  template.detectedEmail = detectedEmail || '';
+  template.messageType   = messageType   || 'not_registered';
   return template.evaluate()
-    .setTitle('Access Denied')
+    .setTitle('Access Denied — Aldhafra IMS')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Admin diagnostic: check whether an email exists in Users_Stores.
+ * Run this from the Apps Script editor (not from the web app) to debug access issues.
+ * Usage: checkUserExists('someone@gmail.com')
+ */
+function checkUserExists(email) {
+  const user = AuthService.getUserInfo(email);
+  if (user) {
+    Logger.log('✅ FOUND: ' + JSON.stringify(user));
+  } else {
+    Logger.log('❌ NOT FOUND for email: ' + email);
+    // Show all registered emails to help spot typos
+    const sheet = getSheet_(CONFIG.SHEETS.USERS_STORES);
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      const data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+      Logger.log('Registered emails in sheet:');
+      data.forEach(function(row) {
+        Logger.log('  ' + row[0] + ' | active=' + row[4]);
+      });
+    }
+  }
 }
 
 /**

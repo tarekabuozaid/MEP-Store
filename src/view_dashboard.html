@@ -9,6 +9,30 @@
     }
 
     container.innerHTML = `
+      <!-- Pro Upsell Banner -->
+      <div onclick="navigate('upgrade')" style="
+        background: linear-gradient(135deg, #1a3c5e, #2563eb);
+        color: white;
+        border-radius: 10px;
+        padding: 0.85rem 1.25rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        transition: opacity 0.2s;
+        gap: 1rem;
+      " onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <span style="font-size:1.3rem;">⭐</span>
+          <div>
+            <strong style="font-size:0.9rem;">رقّي للباقة المحترفة</strong>
+            <div style="font-size:0.78rem;opacity:0.8;margin-top:0.1rem;">فعّل تنبيهات البريد الإلكتروني، طلبات الشراء التلقائية، و5 مخازن</div>
+          </div>
+        </div>
+        <span style="background:rgba(255,255,255,0.2);padding:0.35rem 0.9rem;border-radius:6px;font-size:0.82rem;font-weight:700;white-space:nowrap;">14 يوم مجاناً ←</span>
+      </div>
+
       <div class="card-header" style="background:none;border:none;padding:0;margin-bottom:1rem;">
         <h2 style="color:var(--color-primary);margin:0;">📊 Dashboard</h2>
         <span class="text-muted">${formatDate(new Date())}</span>

@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MEP Store IMS — نظام إدارة مخزون محلات MEP</title>
+  <meta name="description" content="نظام إدارة مخزون متكامل لشركات ومحلات MEP. تتبع المخزون، إدارة المعاملات، تقارير فورية. ابدأ مجاناً.">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1a3c5e;
+      --accent: #2563eb;
+      --accent-light: #3b82f6;
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --gold: #f59e0b;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    /* ─── Navbar ─────────────────────────────────────────── */
+    .navbar {
+      background: var(--primary);
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .navbar .brand {
+      font-size: 1.3rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar .brand span { color: #60a5fa; }
+
+    .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+    .nav-links a {
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: white; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 1.4rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: none;
+      font-family: inherit;
+    }
+
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.4); }
+
+    .btn-outline { background: transparent; color: white; border: 2px solid rgba(255,255,255,0.4); }
+    .btn-outline:hover { border-color: white; background: rgba(255,255,255,0.1); }
+
+    .btn-white { background: white; color: var(--primary); }
+    .btn-white:hover { background: #f0f9ff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+    .btn-lg { padding: 0.85rem 2rem; font-size: 1.05rem; }
+
+    /* ─── Hero ───────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, var(--primary) 0%, #0f2744 50%, #1e3a5f 100%);
+      color: white;
+      padding: 6rem 2rem 4rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 50%, rgba(37,99,235,0.15) 0%, transparent 60%);
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(96,165,250,0.2);
+      border: 1px solid rgba(96,165,250,0.4);
+      color: #93c5fd;
+      padding: 0.3rem 1rem;
+      border-radius: 50px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+
+    .hero h1 span { color: #60a5fa; }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: rgba(255,255,255,0.8);
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+      position: relative;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      position: relative;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 3rem;
+      justify-content: center;
+      margin-top: 4rem;
+      padding-top: 3rem;
+      border-top: 1px solid rgba(255,255,255,0.15);
+      flex-wrap: wrap;
+      gap: 2rem;
+      position: relative;
+    }
+
+    .stat { text-align: center; }
+    .stat-num { font-size: 2.2rem; font-weight: 800; color: #60a5fa; }
+    .stat-label { font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-top: 0.2rem; }
+
+    /* ─── Section Base ───────────────────────────────────── */
+    .section { padding: 5rem 2rem; }
+    .section-alt { background: white; }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    .section-header { text-align: center; margin-bottom: 3.5rem; }
+    .section-tag {
+      display: inline-block;
+      background: #eff6ff;
+      color: var(--accent);
+      padding: 0.3rem 0.9rem;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .section-title { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; margin-bottom: 0.75rem; }
+    .section-subtitle { color: var(--muted); font-size: 1rem; max-width: 500px; margin: 0 auto; }
+
+    /* ─── Features ───────────────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      transition: all 0.3s;
+      position: relative;
+    }
+
+    .feature-card:hover {
+      box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+      transform: translateY(-3px);
+      border-color: var(--accent-light);
+    }
+
+    .feature-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .icon-blue { background: #eff6ff; }
+    .icon-green { background: #f0fdf4; }
+    .icon-orange { background: #fff7ed; }
+    .icon-purple { background: #faf5ff; }
+    .icon-red { background: #fef2f2; }
+    .icon-gold { background: #fffbeb; }
+
+    .feature-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .feature-card p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
+
+    .pro-badge {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: 50px;
+    }
+
+    /* ─── How it works ───────────────────────────────────── */
+    .steps { display: flex; gap: 0; flex-wrap: wrap; }
+
+    .step {
+      flex: 1;
+      min-width: 200px;
+      text-align: center;
+      padding: 2rem 1.5rem;
+      position: relative;
+    }
+
+    .step:not(:last-child)::before {
+      content: '←';
+      position: absolute;
+      left: -0.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.5rem;
+      color: var(--border);
+    }
+
+    .step-num {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      font-size: 1.3rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+
+    .step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .step p { font-size: 0.88rem; color: var(--muted); }
+
+    /* ─── Pricing ─────────────────────────────────────────── */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      align-items: stretch;
+    }
+
+    .pricing-card {
+      background: white;
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .pricing-card:hover { box-shadow: 0 12px 40px rgba(0,0,0,0.1); }
+
+    .pricing-card.popular {
+      border-color: var(--accent);
+      box-shadow: 0 8px 30px rgba(37,99,235,0.15);
+    }
+
+    .popular-badge {
+      position: absolute;
+      top: -1rem;
+      right: 50%;
+      transform: translateX(50%);
+      background: var(--accent);
+      color: white;
+      padding: 0.3rem 1.2rem;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .plan-name { font-size: 1.1rem; font-weight: 700; color: var(--primary); margin-bottom: 0.5rem; }
+    .plan-desc { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; }
+
+    .plan-price {
+      display: flex;
+      align-items: baseline;
+      gap: 0.3rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .price-amount { font-size: 2.5rem; font-weight: 800; color: var(--text); }
+    .price-currency { font-size: 1rem; font-weight: 600; color: var(--muted); }
+    .price-period { font-size: 0.85rem; color: var(--muted); }
+
+    .plan-features { list-style: none; margin: 1.5rem 0; }
+    .plan-features li {
+      padding: 0.5rem 0;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      border-bottom: 1px solid var(--bg);
+    }
+
+    .plan-features li::before { content: '✓'; color: var(--success); font-weight: 700; flex-shrink: 0; }
+    .plan-features li.no::before { content: '✗'; color: var(--border); }
+    .plan-features li.no { color: var(--muted); }
+
+    .plan-cta {
+      width: 100%;
+      padding: 0.8rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      border: 2px solid var(--accent);
+      transition: all 0.2s;
+    }
+
+    .plan-cta.primary { background: var(--accent); color: white; }
+    .plan-cta.primary:hover { background: #1d4ed8; }
+    .plan-cta.outline { background: transparent; color: var(--accent); }
+    .plan-cta.outline:hover { background: var(--accent); color: white; }
+    .plan-cta.dark { background: var(--primary); color: white; border-color: var(--primary); }
+    .plan-cta.dark:hover { background: #0f2744; }
+
+    /* ─── Testimonials ───────────────────────────────────── */
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .testimonial-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      position: relative;
+    }
+
+    .testimonial-card::before {
+      content: '"';
+      position: absolute;
+      top: 1rem;
+      right: 1.5rem;
+      font-size: 4rem;
+      color: var(--accent);
+      opacity: 0.15;
+      font-family: Georgia, serif;
+      line-height: 1;
+    }
+
+    .testimonial-text { font-size: 0.92rem; color: var(--text); line-height: 1.7; margin-bottom: 1.2rem; }
+    .testimonial-author { display: flex; align-items: center; gap: 0.75rem; }
+    .author-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--primary));
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .author-name { font-weight: 700; font-size: 0.9rem; }
+    .author-role { font-size: 0.8rem; color: var(--muted); }
+
+    .stars { color: var(--gold); font-size: 0.9rem; margin-bottom: 0.75rem; }
+
+    /* ─── CTA Banner ─────────────────────────────────────── */
+    .cta-banner {
+      background: linear-gradient(135deg, var(--primary), #0f2744);
+      color: white;
+      text-align: center;
+      padding: 5rem 2rem;
+    }
+
+    .cta-banner h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; margin-bottom: 1rem; }
+    .cta-banner p { color: rgba(255,255,255,0.8); margin-bottom: 2rem; font-size: 1rem; }
+
+    /* ─── Footer ─────────────────────────────────────────── */
+    footer {
+      background: #0f1f33;
+      color: rgba(255,255,255,0.7);
+      padding: 3rem 2rem 2rem;
+      text-align: center;
+    }
+
+    .footer-brand { font-size: 1.2rem; font-weight: 800; color: white; margin-bottom: 0.5rem; }
+    .footer-links { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; margin: 1.5rem 0; }
+    .footer-links a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 0.9rem; }
+    .footer-links a:hover { color: white; }
+    .footer-copy { font-size: 0.8rem; color: rgba(255,255,255,0.4); }
+
+    /* ─── Comparison Table ───────────────────────────────── */
+    .compare-table { width: 100%; border-collapse: collapse; }
+    .compare-table th, .compare-table td {
+      padding: 0.9rem 1rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    .compare-table th { background: var(--bg); font-weight: 700; color: var(--primary); }
+    .compare-table td:first-child { text-align: right; color: var(--text); font-weight: 500; }
+    .compare-table th:first-child { text-align: right; }
+    .compare-table tr:hover td { background: #f8fafc; }
+    .compare-table .check { color: var(--success); font-size: 1.1rem; }
+    .compare-table .cross { color: var(--border); font-size: 1.1rem; }
+    .compare-table th.popular-col { color: var(--accent); }
+
+    /* ─── Responsive ─────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .hero { padding: 4rem 1.5rem 3rem; }
+      .section { padding: 3.5rem 1.5rem; }
+      .hero-stats { gap: 1.5rem; }
+      .steps { flex-direction: column; }
+      .step:not(:last-child)::before { display: none; }
+      table { font-size: 0.8rem; }
+      .compare-table th, .compare-table td { padding: 0.7rem 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="brand">
+    📦 <span>MEP</span> Store IMS
+  </div>
+  <div class="nav-links">
+    <a href="#features">المميزات</a>
+    <a href="#how">كيف يعمل</a>
+    <a href="#pricing">الأسعار</a>
+    <a href="#testimonials">آراء العملاء</a>
+    <a href="pricing.html" class="btn btn-outline" style="padding:0.4rem 1rem;font-size:0.88rem;">عرض الأسعار</a>
+    <a href="#demo" class="btn btn-primary" style="padding:0.4rem 1rem;font-size:0.88rem;">ابدأ مجاناً</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">🚀 يُعتمد عليه من شركات MEP في الخليج</div>
+    <h1>
+      أدِر مخازن MEP بذكاء<br>
+      <span>وقل وداعاً لـ Excel</span>
+    </h1>
+    <p>
+      نظام متكامل لإدارة مخزون شركات الميكانيكا والكهرباء والسباكة.
+      تتبع فوري، تقارير احترافية، وتحكم كامل من أي جهاز.
+    </p>
+    <div class="hero-buttons">
+      <a href="#demo" class="btn btn-white btn-lg">🎯 ابدأ تجربة مجانية 14 يوم</a>
+      <a href="#demo" class="btn btn-outline btn-lg">📺 شاهد العرض</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat">
+        <div class="stat-num">50+</div>
+        <div class="stat-label">شركة تستخدمه</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">10K+</div>
+        <div class="stat-label">معاملة يومياً</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">99.9%</div>
+        <div class="stat-label">وقت تشغيل</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">14</div>
+        <div class="stat-label">يوم تجريبي مجاناً</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section section-alt" id="features">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">المميزات</div>
+      <h2 class="section-title">كل ما تحتاجه لإدارة مخزون MEP</h2>
+      <p class="section-subtitle">من إدخال المعاملات إلى التقارير المتقدمة — كل شيء في مكان واحد</p>
+    </div>
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="feature-icon icon-blue">📊</div>
+        <h3>لوحة تحكم فورية</h3>
+        <p>تابع حالة مخازنك لحظة بلحظة. تنبيهات المخزون المنخفض، آخر المعاملات، ومؤشرات الأداء الرئيسية.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-green">🔄</div>
+        <h3>4 أنواع معاملات</h3>
+        <p>استلام، صرف، تسوية، ونقل بين المخازن. كل معاملة بـ ID فريد ومتسلسل تلقائياً.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-orange">📦</div>
+        <h3>إدارة متعددة المواقع</h3>
+        <p>أدِر عدة مخازن في نفس الوقت. كل موقع برصيد معزول ومسؤول مخصص.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-purple">👥</div>
+        <h3>صلاحيات متدرجة</h3>
+        <p>ثلاثة أدوار: مسؤول كامل، أمين مخزن، ومشاهد فقط. كل مستخدم يرى ما يخصه فقط.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-gold">📈</div>
+        <h3>تقارير Excel فورية</h3>
+        <p>صدّر الدفتر الكامل، مصفوفة الأرصدة، وسجل المعاملات بنقرة واحدة.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="pro-badge">PRO</span>
+        <div class="feature-icon icon-blue">🔔</div>
+        <h3>تنبيهات البريد الإلكتروني</h3>
+        <p>تلقّ تنبيهات تلقائية عند انخفاض المخزون عن الحد الأدنى أو عند تجاوز حد الطلب.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="pro-badge">PRO</span>
+        <div class="feature-icon icon-green">📋</div>
+        <h3>طلبات الشراء التلقائية</h3>
+        <p>اقتراحات شراء ذكية بناءً على معدل الاستهلاك التاريخي والحد الأدنى للمخزون.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="pro-badge">PRO</span>
+        <div class="feature-icon icon-purple">🔌</div>
+        <h3>API للتكامل</h3>
+        <p>ادمج النظام مع ERP أو أنظمة المحاسبة لديك عبر REST API موثقة كاملاً.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-red">🔒</div>
+        <h3>سجل تدقيق كامل</h3>
+        <p>كل إجراء مسجل: من أجراه، متى، وماذا غيّر. تتبع كامل للمسؤوليات.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="section" id="how">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">كيف يعمل</div>
+      <h2 class="section-title">جاهز للعمل خلال 24 ساعة</h2>
+      <p class="section-subtitle">إعداد سريع بدون خبرة تقنية مطلوبة</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">١</div>
+        <h3>سجّل واختر باقتك</h3>
+        <p>اختر الباقة المناسبة وأنشئ حسابك في دقيقتين</p>
+      </div>
+      <div class="step">
+        <div class="step-num">٢</div>
+        <h3>أضف مخازنك وأصنافك</h3>
+        <p>استورد قائمة أصنافك من Excel أو أدخلها يدوياً</p>
+      </div>
+      <div class="step">
+        <div class="step-num">٣</div>
+        <h3>أضف فريقك</h3>
+        <p>أضف أمناء المخازن وحدد صلاحيات كل مستخدم</p>
+      </div>
+      <div class="step">
+        <div class="step-num">٤</div>
+        <h3>ابدأ العمل فوراً</h3>
+        <p>سجّل المعاملات وتابع المخزون من أي جهاز</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section class="section section-alt" id="pricing">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">الأسعار</div>
+      <h2 class="section-title">باقات تناسب كل حجم أعمال</h2>
+      <p class="section-subtitle">ابدأ مجاناً، ادفع عند النمو</p>
+    </div>
+    <div class="pricing-grid">
+
+      <!-- Basic -->
+      <div class="pricing-card">
+        <div class="plan-name">أساسي</div>
+        <div class="plan-desc">للشركات الصغيرة التي بدأت للتو</div>
+        <div class="plan-price">
+          <span class="price-amount">مجاناً</span>
+        </div>
+        <p class="price-period">للأبد — بدون بطاقة ائتمان</p>
+        <ul class="plan-features">
+          <li>مخزن واحد</li>
+          <li>حتى 3 مستخدمين</li>
+          <li>500 معاملة / شهر</li>
+          <li>تقارير أساسية</li>
+          <li>تصدير Excel</li>
+          <li class="no">تنبيهات بريد إلكتروني</li>
+          <li class="no">طلبات شراء تلقائية</li>
+          <li class="no">API</li>
+        </ul>
+        <button class="plan-cta outline">ابدأ مجاناً</button>
+      </div>
+
+      <!-- Pro -->
+      <div class="pricing-card popular">
+        <div class="popular-badge">⭐ الأكثر طلباً</div>
+        <div class="plan-name">محترف</div>
+        <div class="plan-desc">للشركات النامية ذات مخازن متعددة</div>
+        <div class="plan-price">
+          <span class="price-currency">AED</span>
+          <span class="price-amount">299</span>
+        </div>
+        <p class="price-period">شهرياً · إلغاء في أي وقت</p>
+        <ul class="plan-features">
+          <li>حتى 5 مخازن</li>
+          <li>حتى 15 مستخدم</li>
+          <li>معاملات غير محدودة</li>
+          <li>تقارير متقدمة</li>
+          <li>تصدير Excel و PDF</li>
+          <li>تنبيهات بريد إلكتروني</li>
+          <li>طلبات شراء تلقائية</li>
+          <li class="no">API</li>
+        </ul>
+        <button class="plan-cta primary">ابدأ 14 يوم مجاناً</button>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="pricing-card">
+        <div class="plan-name">مؤسسي</div>
+        <div class="plan-desc">للمقاولين الكبار وشركات التشغيل والصيانة</div>
+        <div class="plan-price">
+          <span class="price-currency">AED</span>
+          <span class="price-amount">799</span>
+        </div>
+        <p class="price-period">شهرياً · فوترة سنوية متاحة</p>
+        <ul class="plan-features">
+          <li>مخازن غير محدودة</li>
+          <li>مستخدمون غير محدودون</li>
+          <li>معاملات غير محدودة</li>
+          <li>تقارير مخصصة</li>
+          <li>تصدير بجميع الصيغ</li>
+          <li>تنبيهات متقدمة + SMS</li>
+          <li>طلبات شراء ذكية</li>
+          <li>API كاملة + Webhooks</li>
+        </ul>
+        <button class="plan-cta dark">تواصل معنا</button>
+      </div>
+
+    </div>
+
+    <!-- Comparison Table -->
+    <div style="margin-top:3rem;overflow-x:auto;">
+      <h3 style="text-align:center;margin-bottom:1.5rem;font-size:1.1rem;">مقارنة تفصيلية بين الباقات</h3>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>الميزة</th>
+            <th>أساسي</th>
+            <th class="popular-col">محترف ⭐</th>
+            <th>مؤسسي</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>عدد المخازن</td><td>1</td><td>5</td><td>غير محدود</td></tr>
+          <tr><td>عدد المستخدمين</td><td>3</td><td>15</td><td>غير محدود</td></tr>
+          <tr><td>المعاملات الشهرية</td><td>500</td><td>غير محدودة</td><td>غير محدودة</td></tr>
+          <tr><td>أنواع المعاملات الـ 4</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>تصدير Excel</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>سجل التدقيق</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>تنبيهات مخزون منخفض</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>تنبيهات بريد إلكتروني</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>طلبات شراء تلقائية</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>تقارير مخصصة</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+          <tr><td>REST API</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+          <tr><td>Webhooks</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+          <tr><td>دعم فني</td><td>بريد إلكتروني</td><td>أولوية</td><td>مدير حساب مخصص</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="section" id="testimonials">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">آراء العملاء</div>
+      <h2 class="section-title">يثق به المحترفون</h2>
+    </div>
+    <div class="testimonials-grid">
+
+      <div class="testimonial-card">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-text">
+          وفّرنا ساعات طويلة كنا نضيعها في تحديث جداول Excel يدوياً. الآن كل شيء تلقائي ودقيق، وأي موظف يقدر يشوف الرصيد فوراً.
+        </p>
+        <div class="testimonial-author">
+          <div class="author-avatar">م.أ</div>
+          <div>
+            <div class="author-name">محمد الأحمدي</div>
+            <div class="author-role">مدير مخازن — شركة الصقر للمقاولات، أبوظبي</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="testimonial-card">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-text">
+          أفضل استثمار في الوقت والمال. النظام سهل جداً وأمناء المخازن عندنا تعلموه في يوم واحد. التقارير مقنعة للإدارة.
+        </p>
+        <div class="testimonial-author">
+          <div class="author-avatar">س.ع</div>
+          <div>
+            <div class="author-name">سالم العامري</div>
+            <div class="author-role">مدير عمليات — مجموعة تقنيات البناء، دبي</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="testimonial-card">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-text">
+          المخزون المنخفض كان مشكلة دائمة عندنا. الآن التنبيهات التلقائية تعطيني إنذار مبكر، وصارت علاقتنا مع الموردين أفضل بكثير.
+        </p>
+        <div class="testimonial-author">
+          <div class="author-avatar">خ.م</div>
+          <div>
+            <div class="author-name">خالد المزروعي</div>
+            <div class="author-role">مالك — متجر الذفرة لمواد البناء، العين</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-banner" id="demo">
+  <div class="container">
+    <h2>مستعد تبدأ؟</h2>
+    <p>جرّب النظام 14 يوماً مجاناً — بدون بطاقة ائتمان، بدون التزام</p>
+    <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+      <a href="mailto:info@mepstore.app?subject=طلب تجربة مجانية" class="btn btn-white btn-lg">
+        📧 ابدأ التجربة المجانية
+      </a>
+      <a href="https://wa.me/971500000000" class="btn btn-outline btn-lg">
+        💬 تواصل عبر واتساب
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-brand">📦 MEP Store IMS</div>
+  <p style="font-size:0.85rem;margin-bottom:0.5rem;">نظام إدارة مخزون محلات الميكانيكا والكهرباء والسباكة</p>
+  <div class="footer-links">
+    <a href="#features">المميزات</a>
+    <a href="#pricing">الأسعار</a>
+    <a href="pricing.html">مقارنة الباقات</a>
+    <a href="mailto:info@mepstore.app">تواصل معنا</a>
+    <a href="#">سياسة الخصوصية</a>
+  </div>
+  <p class="footer-copy">© 2026 MEP Store IMS — جميع الحقوق محفوظة</p>
+</footer>
+
+</body>
+</html>

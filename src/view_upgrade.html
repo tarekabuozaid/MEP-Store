@@ -1,0 +1,230 @@
+<div id="view-upgrade" class="view" style="display:none;">
+  <div style="max-width:900px;margin:0 auto;">
+
+    <!-- Current Plan Banner -->
+    <div id="current-plan-banner" style="
+      background: linear-gradient(135deg, #1a3c5e, #0f2744);
+      color: white;
+      border-radius: 12px;
+      padding: 1.75rem 2rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    ">
+      <div>
+        <div style="font-size:0.8rem;opacity:0.7;margin-bottom:0.3rem;">باقتك الحالية</div>
+        <div style="font-size:1.4rem;font-weight:800;" id="current-plan-name">أساسي</div>
+        <div style="font-size:0.85rem;opacity:0.75;margin-top:0.3rem;" id="current-plan-expiry">مجانية — غير محدودة</div>
+      </div>
+      <div style="text-align:left;">
+        <div style="font-size:0.8rem;opacity:0.7;margin-bottom:0.5rem;">استخدامك هذا الشهر</div>
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:1.3rem;font-weight:800;" id="usage-txn">143</div>
+            <div style="font-size:0.75rem;opacity:0.7;">معاملة من 500</div>
+          </div>
+          <div>
+            <div style="font-size:1.3rem;font-weight:800;" id="usage-users">3</div>
+            <div style="font-size:0.75rem;opacity:0.7;">مستخدم من 3</div>
+          </div>
+          <div>
+            <div style="font-size:1.3rem;font-weight:800;" id="usage-stores">1</div>
+            <div style="font-size:0.75rem;opacity:0.7;">مخزن من 1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Usage Warning -->
+    <div id="usage-warning" style="
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-right: 4px solid #f97316;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.9rem;
+    ">
+      ⚠️ <span>وصلت لـ <strong>3 مستخدمين</strong> — الحد الأقصى في الباقة الأساسية. <a href="#" onclick="document.getElementById('plan-pro').scrollIntoView({behavior:'smooth'})" style="color:#2563eb;font-weight:600;">رقّي للمحترف</a> لإضافة المزيد.</span>
+    </div>
+
+    <!-- Plans Grid -->
+    <h2 style="font-size:1.3rem;font-weight:800;margin-bottom:0.5rem;">اختر باقتك</h2>
+    <p style="color:#6b7280;font-size:0.9rem;margin-bottom:1.5rem;">ترقية فورية — بدون انقطاع في الخدمة</p>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;">
+
+      <!-- Basic -->
+      <div style="border:2px solid #e5e7eb;border-radius:12px;padding:1.5rem;background:#f9fafb;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+          <span style="font-weight:800;color:#1a3c5e;">أساسي</span>
+          <span style="background:#e5e7eb;color:#6b7280;font-size:0.72rem;padding:0.2rem 0.6rem;border-radius:50px;font-weight:600;">باقتك الحالية</span>
+        </div>
+        <div style="font-size:1.8rem;font-weight:800;margin-bottom:0.25rem;">مجاناً</div>
+        <div style="font-size:0.8rem;color:#6b7280;margin-bottom:1.25rem;">للأبد</div>
+        <ul style="list-style:none;font-size:0.85rem;color:#374151;display:flex;flex-direction:column;gap:0.5rem;">
+          <li>✓ مخزن واحد</li>
+          <li>✓ 3 مستخدمين</li>
+          <li>✓ 500 معاملة/شهر</li>
+          <li style="color:#9ca3af;">✗ تنبيهات بريد</li>
+          <li style="color:#9ca3af;">✗ طلبات شراء</li>
+          <li style="color:#9ca3af;">✗ API</li>
+        </ul>
+        <button style="width:100%;margin-top:1.25rem;padding:0.65rem;border:2px solid #e5e7eb;border-radius:8px;background:white;color:#6b7280;font-size:0.88rem;cursor:default;font-family:inherit;font-weight:600;" disabled>باقتك الحالية</button>
+      </div>
+
+      <!-- Pro -->
+      <div id="plan-pro" style="border:2px solid #2563eb;border-radius:12px;padding:1.5rem;background:white;box-shadow:0 8px 24px rgba(37,99,235,0.12);position:relative;">
+        <div style="position:absolute;top:-0.9rem;right:50%;transform:translateX(50%);background:#2563eb;color:white;font-size:0.72rem;font-weight:700;padding:0.25rem 0.9rem;border-radius:50px;white-space:nowrap;">⭐ الأكثر طلباً</div>
+        <div style="font-weight:800;color:#1a3c5e;margin-bottom:1rem;">محترف</div>
+        <div style="display:flex;align-items:baseline;gap:0.2rem;margin-bottom:0.25rem;">
+          <span style="font-size:0.9rem;color:#6b7280;">AED</span>
+          <span style="font-size:1.8rem;font-weight:800;">299</span>
+        </div>
+        <div style="font-size:0.8rem;color:#6b7280;margin-bottom:1.25rem;">/شهر · إلغاء في أي وقت</div>
+        <ul style="list-style:none;font-size:0.85rem;color:#374151;display:flex;flex-direction:column;gap:0.5rem;">
+          <li>✓ حتى 5 مخازن</li>
+          <li>✓ 15 مستخدم</li>
+          <li>✓ معاملات غير محدودة</li>
+          <li style="color:#16a34a;font-weight:600;">✓ تنبيهات بريد إلكتروني</li>
+          <li style="color:#16a34a;font-weight:600;">✓ طلبات شراء تلقائية</li>
+          <li style="color:#9ca3af;">✗ API</li>
+        </ul>
+        <button onclick="handleUpgrade('pro')" style="width:100%;margin-top:1.25rem;padding:0.65rem;border:none;border-radius:8px;background:#2563eb;color:white;font-size:0.9rem;cursor:pointer;font-family:inherit;font-weight:700;transition:background 0.2s;"
+          onmouseover="this.style.background='#1d4ed8'"
+          onmouseout="this.style.background='#2563eb'">
+          رقّي الآن — 14 يوم مجاناً
+        </button>
+      </div>
+
+      <!-- Enterprise -->
+      <div style="border:2px solid #e5e7eb;border-radius:12px;padding:1.5rem;background:white;">
+        <div style="font-weight:800;color:#1a3c5e;margin-bottom:1rem;">مؤسسي</div>
+        <div style="display:flex;align-items:baseline;gap:0.2rem;margin-bottom:0.25rem;">
+          <span style="font-size:0.9rem;color:#6b7280;">AED</span>
+          <span style="font-size:1.8rem;font-weight:800;">799</span>
+        </div>
+        <div style="font-size:0.8rem;color:#6b7280;margin-bottom:1.25rem;">/شهر · خصم 15% سنوياً</div>
+        <ul style="list-style:none;font-size:0.85rem;color:#374151;display:flex;flex-direction:column;gap:0.5rem;">
+          <li>✓ مخازن غير محدودة</li>
+          <li>✓ مستخدمون غير محدودون</li>
+          <li>✓ معاملات غير محدودة</li>
+          <li style="color:#16a34a;font-weight:600;">✓ تنبيهات متقدمة + SMS</li>
+          <li style="color:#16a34a;font-weight:600;">✓ طلبات شراء ذكية</li>
+          <li style="color:#16a34a;font-weight:600;">✓ API كاملة + Webhooks</li>
+        </ul>
+        <button onclick="handleUpgrade('enterprise')" style="width:100%;margin-top:1.25rem;padding:0.65rem;border:2px solid #1a3c5e;border-radius:8px;background:#1a3c5e;color:white;font-size:0.9rem;cursor:pointer;font-family:inherit;font-weight:700;transition:background 0.2s;"
+          onmouseover="this.style.background='#0f2744'"
+          onmouseout="this.style.background='#1a3c5e'">
+          تواصل مع فريق المبيعات
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Feature Comparison -->
+    <div style="margin-top:2rem;background:white;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+      <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #e5e7eb;">
+        <h3 style="font-size:1rem;font-weight:700;">مقارنة تفصيلية</h3>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+          <thead>
+            <tr style="background:#f8fafc;">
+              <th style="padding:0.75rem 1rem;text-align:right;font-weight:700;color:#1a3c5e;border-bottom:1px solid #e5e7eb;">الميزة</th>
+              <th style="padding:0.75rem;text-align:center;font-weight:700;color:#6b7280;border-bottom:1px solid #e5e7eb;">أساسي</th>
+              <th style="padding:0.75rem;text-align:center;font-weight:700;color:#2563eb;border-bottom:1px solid #e5e7eb;">محترف ⭐</th>
+              <th style="padding:0.75rem;text-align:center;font-weight:700;color:#1a3c5e;border-bottom:1px solid #e5e7eb;">مؤسسي</th>
+            </tr>
+          </thead>
+          <tbody id="features-compare-body">
+            <tr>
+              <td style="padding:0.7rem 1rem;border-bottom:1px solid #f3f4f6;font-weight:500;">عدد المخازن</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#6b7280;">1</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#2563eb;font-weight:600;">5</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;">∞</td>
+            </tr>
+            <tr style="background:#fafafa;">
+              <td style="padding:0.7rem 1rem;border-bottom:1px solid #f3f4f6;font-weight:500;">المستخدمون</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#6b7280;">3</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#2563eb;font-weight:600;">15</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;">∞</td>
+            </tr>
+            <tr>
+              <td style="padding:0.7rem 1rem;border-bottom:1px solid #f3f4f6;font-weight:500;">المعاملات الشهرية</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#6b7280;">500</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#2563eb;font-weight:600;">∞</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;">∞</td>
+            </tr>
+            <tr style="background:#fafafa;">
+              <td style="padding:0.7rem 1rem;border-bottom:1px solid #f3f4f6;font-weight:500;">تنبيهات مخزون منخفض</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#d1d5db;">✗</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#16a34a;font-size:1rem;">✓</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#16a34a;font-size:1rem;">✓</td>
+            </tr>
+            <tr>
+              <td style="padding:0.7rem 1rem;border-bottom:1px solid #f3f4f6;font-weight:500;">تنبيهات بريد إلكتروني</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#d1d5db;">✗</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#16a34a;font-size:1rem;">✓</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#16a34a;font-size:1rem;">✓</td>
+            </tr>
+            <tr style="background:#fafafa;">
+              <td style="padding:0.7rem 1rem;border-bottom:1px solid #f3f4f6;font-weight:500;">طلبات شراء تلقائية</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#d1d5db;">✗</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#16a34a;font-size:1rem;">✓</td>
+              <td style="padding:0.7rem;text-align:center;border-bottom:1px solid #f3f4f6;color:#16a34a;font-size:1rem;">✓</td>
+            </tr>
+            <tr>
+              <td style="padding:0.7rem 1rem;font-weight:500;">API + Webhooks</td>
+              <td style="padding:0.7rem;text-align:center;color:#d1d5db;">✗</td>
+              <td style="padding:0.7rem;text-align:center;color:#d1d5db;">✗</td>
+              <td style="padding:0.7rem;text-align:center;color:#16a34a;font-size:1rem;">✓</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FAQ -->
+    <div style="margin-top:2rem;">
+      <h3 style="font-size:1rem;font-weight:700;margin-bottom:1.25rem;">أسئلة شائعة</h3>
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+
+        <details style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:1rem 1.25rem;">
+          <summary style="font-weight:600;cursor:pointer;font-size:0.9rem;">هل يمكن الإلغاء في أي وقت؟</summary>
+          <p style="margin-top:0.75rem;font-size:0.87rem;color:#6b7280;line-height:1.7;">نعم، يمكنك إلغاء اشتراكك في أي وقت. ستواصل الاستمتاع بالمميزات حتى نهاية فترة الاشتراك المدفوعة.</p>
+        </details>
+
+        <details style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:1rem 1.25rem;">
+          <summary style="font-weight:600;cursor:pointer;font-size:0.9rem;">ماذا يحدث ببياناتي عند الإلغاء؟</summary>
+          <p style="margin-top:0.75rem;font-size:0.87rem;color:#6b7280;line-height:1.7;">بياناتك محفوظة دائماً في Google Sheets الخاص بك. لا نحذف أي بيانات، وتستطيع تصدير كل شيء قبل الإلغاء.</p>
+        </details>
+
+        <details style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:1rem 1.25rem;">
+          <summary style="font-weight:600;cursor:pointer;font-size:0.9rem;">هل هناك خصم للدفع السنوي؟</summary>
+          <p style="margin-top:0.75rem;font-size:0.87mm;color:#6b7280;line-height:1.7;">نعم! الدفع السنوي يوفر لك شهرين مجاناً (خصم 15%). تواصل معنا للحصول على عرض الباقة السنوية.</p>
+        </details>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function handleUpgrade(plan) {
+  if (plan === 'pro') {
+    const msg = 'سيتم تحويلك لصفحة الدفع لتفعيل الباقة المحترفة (14 يوم مجاناً).\n\nللتواصل: info@mepstore.app';
+    alert(msg);
+  } else if (plan === 'enterprise') {
+    const msg = 'سيتواصل معك فريق المبيعات خلال 24 ساعة.\n\nللتواصل الفوري:\ninfo@mepstore.app\nواتساب: +971 50 000 0000';
+    alert(msg);
+  }
+}
+</script>

@@ -39,12 +39,18 @@ AuthService.getUserInfo(email)
 
 ## 3. إعداد Web App
 
-| الإعداد | القيمة | السبب |
+| الإعداد | القيمة (v2.0+) | السبب |
 |---------|--------|-------|
-| Execute the app as | **Me (owner)** | الـ Script يقرأ/يكتب Sheets بصلاحيات المالك — المستخدم لا يحتاج Edit |
+| Execute the app as | **USER_ACCESSING** | في appsscript.json — يسمح بتسجيل بريد المستخدم الحالي بدقة في Audit_Log وجميع السجلات. بدلاً من `USER_DEPLOYING` في الإصدارات السابقة |
 | Who has access | **Anyone with a Google account** | يجبر على تسجيل دخول Google؛ `Session.getActiveUser()` يُعطي الإيميل |
 
 ⚠️ **لا تستخدم "Anyone (even anonymous)"** — لن يكون `Session.getActiveUser()` متاحاً.
+
+**ملاحظة:** تم تغيير `executeAs` إلى `USER_ACCESSING` في v2.0 للحصول على بيانات المستخدم الفعلي بدقة أكبر في التدقيق.
+
+**OAuth Scopes (v2.0+):**
+- `https://www.googleapis.com/auth/spreadsheets` — قراءة/كتابة البيانات
+- `https://www.googleapis.com/auth/drive.readonly` — قراءة معلومات الملف (للمستقبل)
 
 ---
 

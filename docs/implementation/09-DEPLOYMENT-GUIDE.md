@@ -139,9 +139,13 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
   "timeZone": "Asia/Dubai",
   "dependencies": {},
   "webapp": {
-    "executeAs": "USER_DEPLOYING",
+    "executeAs": "USER_ACCESSING",
     "access": "ANYONE"
   },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.readonly"
+  ],
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8"
 }
@@ -149,7 +153,7 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
 
 أضف إلى الملف حقول **`oauthScopes`** وغيرها حسب **`src/appsscript.json`** في المستودع.
 
-**مهم:** `executeAs` يجب أن يكون `USER_DEPLOYING` (أي: Me / المالك).
+**مهم:** `executeAs` يجب أن يكون `USER_ACCESSING` (في v2.0+) — بدلاً من `USER_DEPLOYING`؛ هذا يسمح للنظام بتسجيل بريد المستخدم الحالي بدقة في Audit_Log.
 
 ---
 
@@ -157,6 +161,9 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
 
 **مشروع Apps Script («Aldhafra IMS») — معرّف السكربت الحالي:**
 `1LEZ1H4GvzW7Hot5cQTbvOYYTQy1UYkPinSQbCqufJ4eBprkzqcFPCeOY`
+
+**الـ Spreadsheet ID:**
+`1pavGKYRZeGR71Gi4l_FAWwAT5SesKBNR7YZsRD87l6U`
 
 الخطوات النموذجية (من جهاز المطور):
 
@@ -256,13 +263,13 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
 
 احتفظ بهذه المعلومات في مكان آمن:
 
-| المتغير | القيمة | الاستخدام |
+| المتغير | القيمة (Aldhafra v2.0) | الاستخدام |
 |---------|--------|---------|
-| `SPREADSHEET_ID` | ID الملف من الـ URL | في Code.gs |
-| `SCRIPT_ID` / `.clasp.json` | `1LEZ1H4GvzW7Hot5cQTbvOYYTQy1UYkPinSQbCqufJ4eBprkzqcFPCeOY` (مثال مشروع Aldhafra IMS) | `clasp` |
-| `PROD_WEB_APP_URL` | رابط `/exec` (مثال نشر حقيقي: `https://script.google.com/macros/s/AKfycbznw4l5cq9wHJSTKtc9y8up5f28_avppDO4csc5uF1KXWBOaCefnzcueYqFvuCtCwu4/exec`) | للمستخدمين |
-| `DEV_WEB_APP_URL` | رابط `/dev` | للاختبار |
-| `ADMIN_EMAIL` | بريد الأدمن | للطوارئ |
+| `SPREADSHEET_ID` | `1pavGKYRZeGR71Gi4l_FAWwAT5SesKBNR7YZsRD87l6U` | في Config.gs |
+| `SCRIPT_ID` / `.clasp.json` | `1LEZ1H4GvzW7Hot5cQTbvOYYTQy1UYkPinSQbCqufJ4eBprkzqcFPCeOY` | `clasp` |
+| `PROD_WEB_APP_URL` | `https://script.google.com/macros/s/AKfycbw3k7biBWAHQlLIkoFyvN008WDgzDCl6LIUz96M0zJqvaKXwGCK6DMtyDKZb2aW79kd/exec` | للمستخدمين (النسخة الحالية) |
+| `DEV_WEB_APP_URL` | رابط `/dev` (من محرر Apps Script) | للاختبار |
+| `ADMIN_EMAIL` | بريد الأدمن | للطوارئ + تنبيهات |
 
 ---
 

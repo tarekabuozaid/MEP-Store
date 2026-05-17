@@ -3,8 +3,11 @@
 Inventory Management System for Aldhafra MEP stores.
 Built with Google Apps Script + Google Sheets, migrated from the legacy Excel/VBA system.
 
-[![Status](https://img.shields.io/badge/status-ready--for--deployment-success)]()
+[![Status](https://img.shields.io/badge/status-Live%20v2.0-success)]()
 [![Platform](https://img.shields.io/badge/platform-Google%20Apps%20Script-blue)]()
+[![Deployment](https://img.shields.io/badge/deployed-May%202026-blue)]()
+
+**Live URL (v2.0):** `https://script.google.com/macros/s/AKfycbw3k7biBWAHQlLIkoFyvN008WDgzDCl6LIUz96M0zJqvaKXwGCK6DMtyDKZb2aW79kd/exec`
 
 ---
 
@@ -100,6 +103,18 @@ Full deployment instructions are in [docs/implementation/09-DEPLOYMENT-GUIDE.md]
 
 ---
 
+## v2.1 Roadmap
+
+v2.0 is **live and operational**. The team is planning **v2.1 improvements**:
+
+- **Priority 1:** Item drill-down (view history per item), print/PDF, keeper dashboard
+- **Priority 2:** Auto-focus qty, date format (DD/MM/YYYY), ledger sorting, error toast persistence
+- **Priority 3:** Low-stock email alerts, monthly reports, transfer request approval workflow
+
+[See the full v2.1 roadmap →](docs/implementation/12-ROADMAP-V2.1.md)
+
+---
+
 ## Features
 
 ### For Store Keepers
@@ -137,11 +152,12 @@ Full deployment instructions are in [docs/implementation/09-DEPLOYMENT-GUIDE.md]
 | [04-BUSINESS-LOGIC](docs/implementation/04-BUSINESS-LOGIC.md) | Validation rules, balance calc, transfer pattern |
 | [05-FUNCTION-SPECS](docs/implementation/05-FUNCTION-SPECS.md) | Every Apps Script function spec |
 | [06-UI-SCREENS](docs/implementation/06-UI-SCREENS.md) | All screens with wireframes |
-| [07-AUTH-ROLES](docs/implementation/07-AUTH-ROLES.md) | Auth flow + permissions matrix |
+| [07-AUTH-ROLES](docs/implementation/07-AUTH-ROLES.md) | Auth flow + permissions matrix (updated for v2.0) |
 | [08-TESTING-PLAN](docs/implementation/08-TESTING-PLAN.md) | 35+ test cases |
-| [09-DEPLOYMENT-GUIDE](docs/implementation/09-DEPLOYMENT-GUIDE.md) | Step-by-step deployment |
+| [09-DEPLOYMENT-GUIDE](docs/implementation/09-DEPLOYMENT-GUIDE.md) | Step-by-step deployment (updated for v2.0) |
 | [10-MIGRATION-GUIDE](docs/implementation/10-MIGRATION-GUIDE.md) | Excel → Google migration |
 | [11-IMPLEMENTATION-PHASES](docs/implementation/11-IMPLEMENTATION-PHASES.md) | 6-phase rollout plan |
+| [12-ROADMAP-V2.1](docs/implementation/12-ROADMAP-V2.1.md) | v2.1 improvements: drill-down, print, dashboard, efficiency gains |
 
 ---
 

@@ -64,6 +64,13 @@ const AdminService = (function() {
       new Date()
     ]);
 
+    // Grant spreadsheet editor access so USER_ACCESSING mode works
+    try {
+      SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).addEditor(userData.email.trim());
+    } catch (e) {
+      Logger.log('addUser: could not share spreadsheet with ' + userData.email + ': ' + e.message);
+    }
+
     AuditService.log('USER_ADDED', 'Users_Stores', userData.email, {
       storeCode: userData.storeCode,
       role: userData.role
@@ -120,6 +127,15 @@ const AdminService = (function() {
     if (updates.isActive !== undefined) row[4] = updates.isActive;
 
     sheet.getRange(rowIdx + 2, 1, 1, 6).setValues([row]);
+
+    // If deactivated, remove spreadsheet access
+    if (updates.isActive === false) {
+      try {
+        SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).removeEditor(email);
+      } catch (e) {
+        Logger.log('updateUser: could not remove sheet access for ' + email + ': ' + e.message);
+      }
+    }
 
     AuditService.log('USER_UPDATED', 'Users_Stores', email, updates);
     return { success: true, message: 'Updated' };

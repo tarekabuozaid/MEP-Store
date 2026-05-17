@@ -11,28 +11,13 @@
  * @returns {HtmlOutput} HTML page to render
  */
 function doGet(e) {
-  const activeUser  = Session.getActiveUser();
-  const effectiveUser = Session.getEffectiveUser();
-  const email = (activeUser && activeUser.getEmail()) || '';
-  const effectiveEmail = (effectiveUser && effectiveUser.getEmail()) || '';
+  // With executeAs=USER_ACCESSING, getActiveUser() reliably returns the visiting user's email.
+  const email = (Session.getActiveUser() && Session.getActiveUser().getEmail()) || '';
 
-  // Diagnostic log — visible in Apps Script Executions > Cloud logs
-  Logger.log('doGet: active=' + email + ' | effective=' + effectiveEmail);
+  Logger.log('doGet: email=' + email);
 
   if (!email) {
-    Logger.log('doGet: email empty → redirecting to Google sign-in');
-    // Force Google sign-in: redirect to accounts.google.com with our URL as continue
-    const appUrl = ScriptApp.getService().getUrl();
-    const signinUrl = 'https://accounts.google.com/ServiceLogin?continue=' + encodeURIComponent(appUrl);
-    return HtmlService.createHtmlOutput(
-      '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-      '<meta http-equiv="refresh" content="0;url=' + signinUrl + '">' +
-      '</head><body>' +
-      '<p style="font-family:Arial;text-align:center;margin-top:3rem;">' +
-      'Redirecting to Google sign-in... ' +
-      '<a href="' + signinUrl + '">Click here if not redirected</a></p>' +
-      '</body></html>'
-    ).setTitle('Signing in...');
+    return renderUnauthorized_('', 'not_identified');
   }
 
   let user;
@@ -43,7 +28,7 @@ function doGet(e) {
     return renderError_('System error: ' + err.message);
   }
 
-  Logger.log('doGet: getUserInfo result=' + (user ? JSON.stringify({email: user.email, role: user.role, isActive: user.isActive}) : 'null'));
+  Logger.log('doGet: user=' + (user ? user.role : 'null'));
 
   if (!user) {
     try {

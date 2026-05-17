@@ -148,6 +148,39 @@ function setupLocations() {
 }
 
 /**
+ * One-time migration: share the spreadsheet with all currently active users.
+ * Run this ONCE from the Apps Script editor after switching to USER_ACCESSING.
+ * This is needed because existing users were added before the auto-share logic.
+ */
+function grantAccessToExistingUsers() {
+  const sheet = getSheet_(CONFIG.SHEETS.USERS_STORES);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) { Logger.log('No users found.'); return; }
+
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+  let granted = 0, skipped = 0;
+
+  data.forEach(function(row) {
+    const email    = String(row[0] || '').trim();
+    const isActive = row[4] === true || String(row[4]).toUpperCase() === 'TRUE';
+    if (!email || !isActive) { skipped++; return; }
+    // Skip the owner — they already have access
+    const ownerEmail = Session.getActiveUser().getEmail();
+    if (email.toLowerCase() === ownerEmail.toLowerCase()) { skipped++; return; }
+    try {
+      ss.addEditor(email);
+      Logger.log('✓ Granted editor access: ' + email);
+      granted++;
+    } catch (e) {
+      Logger.log('✗ Failed for ' + email + ': ' + e.message);
+    }
+  });
+
+  Logger.log('Done. Granted: ' + granted + ', Skipped: ' + skipped);
+}
+
+/**
  * Ensure a sheet exists with the given headers.
  */
 function ensureSheet_(ss, name, headers) {

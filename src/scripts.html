@@ -16,12 +16,21 @@
     const toast = document.createElement('div');
     toast.className = 'toast ' + type;
     toast.textContent = message;
+    // Add click-to-dismiss for errors so user can clear faster
+    toast.style.cursor = 'pointer';
+    toast.title = 'Click to dismiss';
+    toast.onclick = function() {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 200);
+    };
     container.appendChild(toast);
+    // Errors get longer visibility (8s) so users don't miss critical feedback
+    const timeout = type === 'error' ? 8000 : 3500;
     setTimeout(() => {
       toast.style.opacity = '0';
       toast.style.transition = 'opacity 0.3s';
       setTimeout(() => toast.remove(), 300);
-    }, 3500);
+    }, timeout);
   }
 
   function createToastContainer() {
@@ -92,14 +101,15 @@
 
     try {
       switch (view) {
-        case 'entry':     await renderEntryView(content); break;
-        case 'stock':     await renderStockView(content); break;
-        case 'history':   await renderHistoryView(content); break;
-        case 'dashboard': await renderDashboardView(content); break;
-        case 'ledger':    await renderLedgerView(content); break;
-        case 'allstock':  await renderAllStockView(content); break;
-        case 'admin':     await renderAdminView(content); break;
-        case 'audit':     await renderAuditView(content); break;
+        case 'entry':            await renderEntryView(content); break;
+        case 'stock':            await renderStockView(content); break;
+        case 'history':          await renderHistoryView(content); break;
+        case 'dashboard':        await renderDashboardView(content); break;
+        case 'keeper_dashboard': await renderKeeperDashboardView(content); break;
+        case 'ledger':           await renderLedgerView(content); break;
+        case 'allstock':         await renderAllStockView(content); break;
+        case 'admin':            await renderAdminView(content); break;
+        case 'audit':            await renderAuditView(content); break;
         default:
           content.innerHTML = '<div class="card"><p>Unknown view</p></div>';
       }
@@ -126,7 +136,8 @@
     const day = String(dt.getDate()).padStart(2, '0');
     const month = String(dt.getMonth() + 1).padStart(2, '0');
     const year = dt.getFullYear();
-    return year + '-' + month + '-' + day;
+    // DD/MM/YYYY display format (Arabic/MENA convention)
+    return day + '/' + month + '/' + year;
   }
 
   function formatDateTime(d) {
@@ -192,7 +203,11 @@
       if (content) content.innerHTML = '<div class="alert alert-error">⚠ Could not identify user session. Please refresh the page.</div>';
       return;
     }
-    const initialView = App.user.role === 'Admin' ? 'dashboard' : 'entry';
+    // Role-aware landing page
+    let initialView = 'entry';
+    if (App.user.role === 'Admin') initialView = 'dashboard';
+    else if (App.user.role === 'Keeper') initialView = 'keeper_dashboard';
+    else if (App.user.role === 'Viewer') initialView = 'stock';
     navigate(initialView);
   });
 

@@ -1,0 +1,124 @@
+<script>
+  // ─── Keeper Landing Dashboard ───────────────────────────────────
+  async function renderKeeperDashboardView(container) {
+    container.innerHTML = '<div class="card"><div class="text-center"><div class="spinner"></div></div></div>';
+
+    let data;
+    try {
+      data = await callApi('api_getKeeperKPIs');
+    } catch (e) {
+      container.innerHTML = '<div class="alert alert-error">Could not load dashboard: ' + escapeHtml(e.message) + '</div>';
+      return;
+    }
+
+    if (!data) {
+      container.innerHTML = '<div class="alert alert-error">No data returned from server.</div>';
+      return;
+    }
+
+    // Admin fallback — should not normally happen
+    if (data.isAdmin) {
+      container.innerHTML = '<div class="alert alert-warning">Redirecting to admin dashboard...</div>';
+      setTimeout(() => navigate('dashboard'), 500);
+      return;
+    }
+
+    const greeting = getGreeting();
+    const fullName = App.user.fullName || App.user.email.split('@')[0];
+
+    container.innerHTML = `
+      <!-- Header with greeting -->
+      <div class="card-header" style="background:none;border:none;padding:0;margin-bottom:1rem;">
+        <div>
+          <h2 style="color:var(--color-primary);margin:0;">${escapeHtml(greeting)}, ${escapeHtml(fullName)}</h2>
+          <span class="text-muted" style="font-size:0.9rem;">
+            📍 ${escapeHtml(data.storeName)} <code>(${escapeHtml(data.storeCode)})</code> · ${formatDate(new Date())}
+          </span>
+        </div>
+      </div>
+
+      <!-- KPI cards (clickable shortcuts) -->
+      <div class="kpi-grid">
+        <div class="kpi kpi-success" style="cursor:pointer;" onclick="navigate('stock')">
+          <div class="kpi-label">Items in Stock</div>
+          <div class="kpi-value">${data.inStockCount}</div>
+          <div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;">in ${escapeHtml(data.storeCode)}</div>
+        </div>
+        <div class="kpi kpi-warning" style="cursor:${data.lowCount > 0 ? 'pointer' : 'default'};"
+             ${data.lowCount > 0 ? 'onclick="navigate(\'stock\')"' : ''}>
+          <div class="kpi-label">Below Minimum</div>
+          <div class="kpi-value">${data.lowCount}</div>
+          <div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;">
+            ${data.lowCount > 0 ? 'needs reorder' : 'all good ✓'}
+          </div>
+        </div>
+        <div class="kpi kpi-danger" style="cursor:${data.zeroCount > 0 ? 'pointer' : 'default'};"
+             ${data.zeroCount > 0 ? 'onclick="navigate(\'stock\')"' : ''}>
+          <div class="kpi-label">Out of Stock</div>
+          <div class="kpi-value">${data.zeroCount}</div>
+          <div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;">zero balance</div>
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="card">
+        <div class="card-header"><h2>⚡ Quick Actions</h2></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;">
+          <button class="btn btn-primary" style="padding:1rem;font-size:1rem;" onclick="navigate('entry')">
+            📝 New Transaction
+          </button>
+          <button class="btn btn-secondary" style="padding:1rem;font-size:1rem;" onclick="navigate('stock')">
+            📦 View My Stock
+          </button>
+          <button class="btn btn-secondary" style="padding:1rem;font-size:1rem;" onclick="navigate('history')">
+            🕐 My History
+          </button>
+        </div>
+      </div>
+
+      <!-- Recent transactions -->
+      <div class="card">
+        <div class="card-header">
+          <h2>🕐 Recent in ${escapeHtml(data.storeCode)}</h2>
+          <button class="btn btn-sm btn-secondary" onclick="navigate('history')">View All →</button>
+        </div>
+        ${data.recentTxns.length === 0
+          ? '<div class="text-center text-muted" style="padding:2rem;">No transactions yet — start by adding your first one!</div>'
+          : `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Item</th>
+                <th class="text-end">Qty</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.recentTxns.map(r => `
+                <tr>
+                  <td>${formatDate(r.date)}</td>
+                  <td><span class="${txnTypeBadgeClass(r.txnType)}">${escapeHtml(r.txnType)}</span></td>
+                  <td>${escapeHtml(r.itemName)} <code class="text-muted">(${escapeHtml(r.itemCode)})</code></td>
+                  <td class="text-end"><strong>${r.qty}</strong> ${escapeHtml(r.unit)}</td>
+                  <td class="text-muted" style="font-size:0.8rem;">${escapeHtml(r.notes || '—')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>`}
+      </div>
+    `;
+  }
+
+  // Greeting that adapts to time of day
+  function getGreeting() {
+    const h = new Date().getHours();
+    if (h < 5)  return '🌙 Good evening';
+    if (h < 12) return '☀ Good morning';
+    if (h < 17) return '👋 Good afternoon';
+    return '🌆 Good evening';
+  }
+</script>

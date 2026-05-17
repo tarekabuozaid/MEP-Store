@@ -22,6 +22,7 @@
         <button class="nav-link" data-view="admin" onclick="navigate('admin')">Admin</button>
         <button class="nav-link" data-view="audit" onclick="navigate('audit')">Audit Log</button>
       <? } else if (user.role === 'Keeper') { ?>
+        <button class="nav-link" data-view="keeper_dashboard" onclick="navigate('keeper_dashboard')">Home</button>
         <button class="nav-link" data-view="entry" onclick="navigate('entry')">New Transaction</button>
         <button class="nav-link" data-view="stock" onclick="navigate('stock')">My Stock</button>
         <button class="nav-link" data-view="history" onclick="navigate('history')">My History</button>
@@ -54,6 +55,7 @@
   <?!= include('view_stock') ?>
   <?!= include('view_history') ?>
   <?!= include('view_dashboard') ?>
+  <?!= include('view_keeper_dashboard') ?>
   <?!= include('view_ledger') ?>
   <?!= include('view_allstock') ?>
   <?!= include('view_admin') ?>

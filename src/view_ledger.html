@@ -82,41 +82,74 @@
       return;
     }
 
+    // Cache rows + default sort (newest first)
+    window.__ledgerRows = rows.slice();
+    window.__ledgerSort = { col: null, dir: -1 };
+
     box.innerHTML = `
-      <div class="mb-1 text-muted" style="font-size:0.85rem;">Total: ${rows.length} transactions</div>
+      <div class="mb-1 text-muted" style="font-size:0.85rem;">
+        Total: <strong>${rows.length}</strong> transactions
+        <span style="margin-left:0.5rem;">— click any column header to sort</span>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>TxnID</th>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Location</th>
-              <th>Item</th>
-              <th class="text-end">Qty</th>
+              <th onclick="sortLedger('txnId')"    style="cursor:pointer;user-select:none;">TxnID ↕</th>
+              <th onclick="sortLedger('date')"     style="cursor:pointer;user-select:none;">Date ↕</th>
+              <th onclick="sortLedger('txnType')"  style="cursor:pointer;user-select:none;">Type ↕</th>
+              <th onclick="sortLedger('location')" style="cursor:pointer;user-select:none;">Location ↕</th>
+              <th onclick="sortLedger('itemName')" style="cursor:pointer;user-select:none;">Item ↕</th>
+              <th class="text-end" onclick="sortLedger('qty')" style="cursor:pointer;user-select:none;">Qty ↕</th>
               <th>LPO</th>
               <th>Supplier / Requester</th>
-              <th>Entered By</th>
+              <th onclick="sortLedger('userEmail')" style="cursor:pointer;user-select:none;">Entered By ↕</th>
             </tr>
           </thead>
-          <tbody>
-            ${rows.map(r => `
-              <tr>
-                <td><code>${escapeHtml(r.txnId)}</code></td>
-                <td>${formatDate(r.date)}</td>
-                <td><span class="${txnTypeBadgeClass(r.txnType)}">${escapeHtml(r.txnType)}</span></td>
-                <td>${escapeHtml(r.location)}</td>
-                <td>${escapeHtml(r.itemName)} <code class="text-muted">(${escapeHtml(r.itemCode)})</code></td>
-                <td class="text-end"><strong>${r.qty}</strong> ${escapeHtml(r.unit)}</td>
-                <td>${escapeHtml(r.lpo || '—')}</td>
-                <td>${escapeHtml(r.supplier || r.requester || '—')}</td>
-                <td class="text-muted" style="font-size:0.8rem;">${escapeHtml(r.userEmail || '')}</td>
-              </tr>
-            `).join('')}
-          </tbody>
+          <tbody id="ledgerTbody"></tbody>
         </table>
       </div>
     `;
+    renderLedgerRows(rows);
+  }
+
+  function sortLedger(col) {
+    const s = window.__ledgerSort;
+    s.dir = (s.col === col) ? s.dir * -1 : 1;
+    s.col = col;
+    const sorted = window.__ledgerRows.slice().sort(function(a, b) {
+      let va = a[col], vb = b[col];
+      if (col === 'date') {
+        va = va ? new Date(va).getTime() : 0;
+        vb = vb ? new Date(vb).getTime() : 0;
+      } else if (typeof va === 'string') {
+        va = (va || '').toLowerCase();
+        vb = (vb || '').toLowerCase();
+      } else {
+        va = Number(va) || 0;
+        vb = Number(vb) || 0;
+      }
+      return va < vb ? -s.dir : va > vb ? s.dir : 0;
+    });
+    renderLedgerRows(sorted);
+  }
+
+  function renderLedgerRows(rows) {
+    const tbody = document.getElementById('ledgerTbody');
+    if (!tbody) return;
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td><code>${escapeHtml(r.txnId)}</code></td>
+        <td>${formatDate(r.date)}</td>
+        <td><span class="${txnTypeBadgeClass(r.txnType)}">${escapeHtml(r.txnType)}</span></td>
+        <td>${escapeHtml(r.location)}</td>
+        <td>${escapeHtml(r.itemName)} <code class="text-muted">(${escapeHtml(r.itemCode)})</code></td>
+        <td class="text-end"><strong>${r.qty}</strong> ${escapeHtml(r.unit)}</td>
+        <td>${escapeHtml(r.lpo || '—')}</td>
+        <td>${escapeHtml(r.supplier || r.requester || '—')}</td>
+        <td class="text-muted" style="font-size:0.8rem;">${escapeHtml(r.userEmail || '')}</td>
+      </tr>
+    `).join('');
   }
 
   async function exportLedger() {

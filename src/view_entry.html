@@ -503,6 +503,13 @@
     tr.dataset.minStock = minStock;
     el.closest('.autocomplete-list').remove();
 
+    // Auto-focus the qty input so the user can type the quantity immediately
+    const qtyInput = tr.querySelector('.item-qty');
+    if (qtyInput) {
+      qtyInput.focus();
+      qtyInput.select();
+    }
+
     const txnType = document.getElementById('txnType').value;
     const location = document.getElementById('sourceLocation').value;
     if ((txnType === 'Issuance' || txnType === 'Transfer') && location) {

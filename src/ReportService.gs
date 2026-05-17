@@ -226,17 +226,78 @@ const ReportService = (function() {
     return entries.slice(0, limit);
   }
 
+  /**
+   * Keeper landing dashboard: own-store KPIs + last 5 transactions.
+   * Returns: { inStockCount, lowCount, zeroCount, recentTxns, storeName, storeCode }
+   */
+  function getKeeperKPIs() {
+    const user = AuthService.getCurrentUser();
+    if (!user) throw new Error('UNAUTHORIZED');
+
+    const storeCode = user.storeCode;
+    if (!storeCode || storeCode === CONFIG.ADMIN_STORE_CODE) {
+      // Admin viewing — fall back to dashboard
+      return { isAdmin: true };
+    }
+
+    const movements = DataService.getStockMovementData();
+    const items     = DataService.getMasterItems(true);
+    const balMap    = DataService.computeAllBalances(movements);
+    const locUp     = storeCode.toUpperCase();
+
+    let inStockCount = 0, lowCount = 0, zeroCount = 0;
+    items.forEach(function(item) {
+      const key = item.itemCode.toUpperCase() + ':' + locUp;
+      if (!(key in balMap)) return;
+      const bal = balMap[key];
+      if (bal > 0) {
+        inStockCount++;
+        if (item.minStock > 0 && bal < item.minStock) lowCount++;
+      } else {
+        zeroCount++;
+      }
+    });
+
+    // Last 5 transactions in this store
+    const myTxns = movements
+      .filter(function(m) { return m.location === storeCode; })
+      .sort(function(a, b) {
+        const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return tb - ta;
+      })
+      .slice(0, 5);
+
+    // Find store display name
+    const locations = DataService.getLocations(false);
+    const locObj = locations.find(function(l) { return l.storeCode === storeCode; });
+    const storeName = locObj ? locObj.storeName : storeCode;
+
+    return {
+      isAdmin:       false,
+      storeCode:     storeCode,
+      storeName:     storeName,
+      inStockCount:  inStockCount,
+      lowCount:      lowCount,
+      zeroCount:     zeroCount,
+      recentTxns:    myTxns,
+      itemCount:     items.length
+    };
+  }
+
   return {
     getDashboardData: getDashboardData,
-    getLedger: getLedger,
-    exportToSheet: exportToSheet,
-    getAuditLog: getAuditLog
+    getKeeperKPIs:    getKeeperKPIs,
+    getLedger:        getLedger,
+    exportToSheet:    exportToSheet,
+    getAuditLog:      getAuditLog
   };
 })();
 
 // ─── Client-callable wrappers ──────────────────────────────────────
 
 function api_getDashboardData()      { return ReportService.getDashboardData(); }
+function api_getKeeperKPIs()         { return ReportService.getKeeperKPIs(); }
 function api_getLedger(filters)      { return ReportService.getLedger(filters); }
 function api_exportToSheet(filters)  { return ReportService.exportToSheet(filters); }
 function api_getAuditLog(filters)    { return ReportService.getAuditLog(filters); }

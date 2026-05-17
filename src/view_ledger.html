@@ -7,7 +7,10 @@
       <div class="card">
         <div class="card-header">
           <h2>📚 Transaction Ledger</h2>
-          <button class="btn btn-primary btn-sm" onclick="exportLedger()">⬇ Export to Excel</button>
+          <div class="flex-gap">
+            <button class="btn btn-primary btn-sm" onclick="exportLedgerCSV()" title="Download as CSV (opens in Excel)">⬇ Download CSV</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportLedger()" title="Create a new Google Sheets file">📂 Export to Sheets</button>
+          </div>
         </div>
 
         <div class="form-row">
@@ -152,13 +155,78 @@
     `).join('');
   }
 
+  // CSV download — instant, client-side, opens directly in Excel
+  function exportLedgerCSV() {
+    const rows = window.__ledgerRows || [];
+    if (rows.length === 0) {
+      showToast('No data to export — run a search first', 'error');
+      return;
+    }
+
+    // CSV escape: wrap in quotes and double-up internal quotes
+    function csvCell(v) {
+      if (v === null || v === undefined) return '';
+      const s = String(v);
+      if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }
+
+    const headers = ['TxnID', 'Date', 'Type', 'Location', 'ItemCode', 'ItemName',
+                     'Unit', 'Qty', 'LPO', 'Supplier', 'Requester', 'Receiver',
+                     'Notes', 'EnteredBy', 'Timestamp'];
+
+    const csvRows = [headers.join(',')];
+    rows.forEach(function(r) {
+      csvRows.push([
+        csvCell(r.txnId),
+        csvCell(r.date),
+        csvCell(r.txnType),
+        csvCell(r.location),
+        csvCell(r.itemCode),
+        csvCell(r.itemName),
+        csvCell(r.unit),
+        csvCell(r.qty),
+        csvCell(r.lpo),
+        csvCell(r.supplier),
+        csvCell(r.requester),
+        csvCell(r.receiver),
+        csvCell(r.notes),
+        csvCell(r.userEmail),
+        csvCell(r.timestamp)
+      ].join(','));
+    });
+
+    // BOM for Excel UTF-8 support (Arabic chars render correctly)
+    const csv = '﻿' + csvRows.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const today = new Date();
+    const dateStr = today.getFullYear() + '-' +
+                    String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(today.getDate()).padStart(2, '0');
+    const filename = 'aldhafra-ledger-' + dateStr + '.csv';
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 100);
+
+    showToast('✓ Downloaded ' + rows.length + ' rows as ' + filename, 'success');
+  }
+
   async function exportLedger() {
     showSpinner();
     try {
       const filters = window.__lastLedgerFilters || {};
       const result = await callApi('api_exportToSheet', filters);
       hideSpinner();
-      if (result.success) {
+      if (result && result.success) {
         showModal(`
           <h3>✓ Export Successful</h3>
           <p>${result.rowCount} transactions exported to a new Google Sheets file.</p>
@@ -168,10 +236,12 @@
             <a href="${escapeHtml(result.url)}" target="_blank" class="btn btn-primary">📂 Open File</a>
           </div>
         `);
+      } else {
+        showToast('Export returned no result. Try CSV download instead.', 'error');
       }
     } catch (e) {
       hideSpinner();
-      showToast('Export error: ' + e.message, 'error');
+      showToast('Sheets export error: ' + e.message + ' — try CSV download instead', 'error');
     }
   }
 </script>

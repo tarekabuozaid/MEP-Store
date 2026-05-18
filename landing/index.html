@@ -6,6 +6,8 @@
   <title>MEP Store IMS — نظام إدارة مخزون محلات MEP</title>
   <meta name="description" content="نظام إدارة مخزون متكامل لشركات ومحلات MEP. تتبع المخزون، إدارة المعاملات، تقارير فورية. ابدأ مجاناً.">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Paddle.js for checkout -->
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
   <style>
     :root {
       --primary: #1a3c5e;
@@ -813,12 +815,164 @@
   <div class="footer-links">
     <a href="#features">المميزات</a>
     <a href="#pricing">الأسعار</a>
-    <a href="pricing.html">مقارنة الباقات</a>
     <a href="mailto:info@mepstore.app">تواصل معنا</a>
     <a href="#">سياسة الخصوصية</a>
   </div>
   <p class="footer-copy">© 2026 MEP Store IMS — جميع الحقوق محفوظة</p>
 </footer>
+
+<!-- ── Register Modal ───────────────────────────────────────────────────── -->
+<div id="register-modal" style="
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);
+  z-index:1000;align-items:center;justify-content:center;
+" onclick="if(event.target===this)closeRegister()">
+  <div style="
+    background:white;border-radius:16px;padding:2rem;width:min(420px,90vw);
+    position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.3);
+  ">
+    <button onclick="closeRegister()" style="
+      position:absolute;top:1rem;left:1rem;background:none;border:none;
+      font-size:1.3rem;cursor:pointer;color:#6b7280;
+    ">✕</button>
+
+    <h2 style="font-size:1.3rem;font-weight:800;color:#1a3c5e;margin-bottom:0.4rem;text-align:center;">
+      ابدأ تجربتك المجانية
+    </h2>
+    <p style="text-align:center;color:#6b7280;font-size:0.88rem;margin-bottom:1.5rem;">
+      30 يوماً مجاناً · بدون بطاقة ائتمان
+    </p>
+
+    <form id="register-form" onsubmit="handleRegister(event)">
+      <div style="display:flex;flex-direction:column;gap:0.9rem;">
+        <div>
+          <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.3rem;">اسم الشركة</label>
+          <input id="reg-company" type="text" required placeholder="مثال: شركة النور للمقاولات"
+            style="width:100%;padding:0.65rem 0.9rem;border:1px solid #e5e7eb;border-radius:8px;font-size:0.9rem;font-family:inherit;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.3rem;">البريد الإلكتروني</label>
+          <input id="reg-email" type="email" required placeholder="you@company.com"
+            style="width:100%;padding:0.65rem 0.9rem;border:1px solid #e5e7eb;border-radius:8px;font-size:0.9rem;font-family:inherit;box-sizing:border-box;direction:ltr;">
+        </div>
+        <div>
+          <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.3rem;">كلمة المرور</label>
+          <input id="reg-password" type="password" required minlength="8" placeholder="8 أحرف على الأقل"
+            style="width:100%;padding:0.65rem 0.9rem;border:1px solid #e5e7eb;border-radius:8px;font-size:0.9rem;font-family:inherit;box-sizing:border-box;">
+        </div>
+
+        <div id="reg-error" style="
+          display:none;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;
+          padding:0.65rem 0.9rem;border-radius:8px;font-size:0.85rem;
+        "></div>
+
+        <button type="submit" id="reg-btn" style="
+          background:#2563eb;color:white;border:none;padding:0.8rem;
+          border-radius:8px;font-size:0.95rem;font-weight:700;cursor:pointer;
+          font-family:inherit;transition:background 0.2s;
+        " onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+          إنشاء الحساب مجاناً ←
+        </button>
+        <p style="text-align:center;font-size:0.78rem;color:#9ca3af;margin:0;">
+          بالتسجيل توافق على شروط الاستخدام وسياسة الخصوصية
+        </p>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Scripts ──────────────────────────────────────────────────────────── -->
+<script>
+  const API_URL = 'https://api.mepstore.app';
+
+  // Paddle price IDs — replace with your actual IDs from Paddle dashboard
+  const PADDLE_PRICES = {
+    starter: 'pri_REPLACE_STARTER',
+    pro:     'pri_REPLACE_PRO',
+  };
+
+  // Initialize Paddle
+  if (typeof Paddle !== 'undefined') {
+    Paddle.Environment.set('sandbox'); // change to 'production' when live
+    Paddle.Initialize({ token: 'REPLACE_WITH_PADDLE_CLIENT_TOKEN' });
+  }
+
+  // ── Register Modal ──────────────────────────────────────────────────────
+  function openRegister() {
+    const m = document.getElementById('register-modal');
+    m.style.display = 'flex';
+    setTimeout(() => document.getElementById('reg-company').focus(), 100);
+  }
+
+  function closeRegister() {
+    document.getElementById('register-modal').style.display = 'none';
+    document.getElementById('reg-error').style.display = 'none';
+    document.getElementById('reg-form')?.reset();
+  }
+
+  async function handleRegister(e) {
+    e.preventDefault();
+    const btn     = document.getElementById('reg-btn');
+    const errDiv  = document.getElementById('reg-error');
+    const company = document.getElementById('reg-company').value.trim();
+    const email   = document.getElementById('reg-email').value.trim();
+    const password= document.getElementById('reg-password').value;
+
+    btn.textContent = 'جاري الإنشاء...';
+    btn.disabled    = true;
+    errDiv.style.display = 'none';
+
+    try {
+      const res = await fetch(`${API_URL}/api/v1/tenant/register`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ companyName: company, email, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        errDiv.textContent = data.message ?? data.error ?? 'حدث خطأ. حاول مجدداً.';
+        errDiv.style.display = 'block';
+        return;
+      }
+
+      // Store token and redirect to app
+      localStorage.setItem('mep_access_token', data.accessToken);
+      localStorage.setItem('mep_tenant_slug',  data.tenant.slug);
+      window.location.href = `https://app.mepstore.app?tenant=${data.tenant.slug}`;
+    } catch {
+      errDiv.textContent = 'تعذر الاتصال بالخادم. تأكد من اتصالك بالإنترنت.';
+      errDiv.style.display = 'block';
+    } finally {
+      btn.textContent = 'إنشاء الحساب مجاناً ←';
+      btn.disabled    = false;
+    }
+  }
+
+  // ── Paddle Checkout ─────────────────────────────────────────────────────
+  function openPaddleCheckout(plan) {
+    if (typeof Paddle === 'undefined') {
+      alert('تعذر تحميل نظام الدفع. أعد تحميل الصفحة.');
+      return;
+    }
+    Paddle.Checkout.open({
+      items: [{ priceId: PADDLE_PRICES[plan], quantity: 1 }],
+      settings: { locale: 'ar', displayMode: 'overlay' },
+    });
+  }
+
+  // Override existing buttons
+  document.addEventListener('DOMContentLoaded', () => {
+    // Wire "جرب مجاناً" buttons → register modal
+    document.querySelectorAll('a[href="#demo"]').forEach(btn => {
+      btn.addEventListener('click', e => { e.preventDefault(); openRegister(); });
+    });
+
+    // Wire pricing subscribe buttons
+    const pricingBtns = document.querySelectorAll('.plan-cta.primary');
+    if (pricingBtns[0]) pricingBtns[0].onclick = () => openRegister();        // Free
+    if (pricingBtns[1]) pricingBtns[1].onclick = () => openPaddleCheckout('starter'); // Starter
+  });
+</script>
 
 </body>
 </html>

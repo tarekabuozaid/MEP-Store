@@ -21,6 +21,7 @@
         <button class="nav-link" data-view="entry" onclick="navigate('entry')">New Transaction</button>
         <button class="nav-link" data-view="admin" onclick="navigate('admin')">Admin</button>
         <button class="nav-link" data-view="audit" onclick="navigate('audit')">Audit Log</button>
+        <button class="nav-link nav-link-upgrade" data-view="upgrade" onclick="navigate('upgrade')" style="color:#f59e0b;font-weight:700;">⭐ الباقة</button>
       <? } else if (user.role === 'Keeper') { ?>
         <button class="nav-link" data-view="keeper_dashboard" onclick="navigate('keeper_dashboard')">Home</button>
         <button class="nav-link" data-view="entry" onclick="navigate('entry')">New Transaction</button>
@@ -60,6 +61,7 @@
   <?!= include('view_allstock') ?>
   <?!= include('view_admin') ?>
   <?!= include('view_audit') ?>
+  <?!= include('view_upgrade') ?>
 
   <script>
     App.user = window.__USER__;

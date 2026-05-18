@@ -110,6 +110,7 @@
         case 'allstock':         await renderAllStockView(content); break;
         case 'admin':            await renderAdminView(content); break;
         case 'audit':            await renderAuditView(content); break;
+        case 'upgrade':          renderUpgradeView(content); break;
         default:
           content.innerHTML = '<div class="card"><p>Unknown view</p></div>';
       }
@@ -211,6 +212,16 @@
     navigate(initialView);
   });
 
+  function renderUpgradeView(content) {
+    const el = document.getElementById('view-upgrade');
+    if (!el) {
+      content.innerHTML = '<div class="alert alert-error">Upgrade view not loaded.</div>';
+      return;
+    }
+    content.innerHTML = el.outerHTML.replace(' style="display:none;"', '').replace(' id="view-upgrade"', '');
+  }
+
   window.navigate = navigate;
   window.closeModal = closeModal;
+  window.handleUpgrade = handleUpgrade;
 </script>
